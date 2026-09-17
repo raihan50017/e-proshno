@@ -1,0 +1,61 @@
+<Project>
+  <!-- Every package version lives here (central package management). Each entry: licence, net8.0 + net10.0 support. -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>false</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+  <ItemGroup Label="ASP.NET Core and EF Core (MIT, bumped to 10.x during the runtime upgrade)">
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.31" />
+    <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.31" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="8.0.31" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="8.0.31" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.31" />
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="8.0.31" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.31" />
+    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="8.10.0" />
+  </ItemGroup>
+  <ItemGroup Label="Data access">
+    <!-- PostgreSQL License (MIT-like); 8.x for net8.0, 10.x after the upgrade -->
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.11" />
+    <!-- Apache-2.0; snake_case naming -->
+    <PackageVersion Include="EFCore.NamingConventions" Version="8.0.3" />
+    <!-- MIT; UUIDv7 ids until Guid.CreateVersion7() (net8.0 + net10.0) -->
+    <PackageVersion Include="UUIDNext" Version="4.2.4" />
+  </ItemGroup>
+  <ItemGroup Label="API">
+    <!-- Apache-2.0; net8.0 -->
+    <PackageVersion Include="FluentValidation" Version="12.1.1" />
+    <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
+    <!-- MIT; net8.0/net9.0/net10.0 -->
+    <PackageVersion Include="Swashbuckle.AspNetCore" Version="10.2.3" />
+    <!-- MIT; net8.0/net9.0/net10.0 -->
+    <PackageVersion Include="Scalar.AspNetCore" Version="2.17.4" />
+    <!-- Apache-2.0; net8.0/net10.0 -->
+    <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />
+    <!-- MIT; memory cache with stampede protection, net8.0 (+ netstandard2.0) -->
+    <PackageVersion Include="ZiggyCreatures.FusionCache" Version="2.8.0" />
+  </ItemGroup>
+  <ItemGroup Label="Jobs, files, PDF">
+    <!-- LGPL-3.0 (used as an unmodified library); netstandard2.0 -->
+    <PackageVersion Include="Hangfire.Core" Version="1.8.25" />
+    <PackageVersion Include="Hangfire.AspNetCore" Version="1.8.25" />
+    <!-- MIT; netstandard2.0 -->
+    <PackageVersion Include="Hangfire.PostgreSql" Version="1.21.1" />
+    <!-- MIT; netstandard2.0 -->
+    <PackageVersion Include="ClosedXML" Version="0.105.1" />
+    <!-- Apache-2.0; netstandard2.0 / net8.0 -->
+    <PackageVersion Include="AWSSDK.S3" Version="4.0.103.3" />
+    <!-- MIT; netstandard2.0 -->
+    <PackageVersion Include="Microsoft.Playwright" Version="1.62.0" />
+  </ItemGroup>
+  <ItemGroup Label="Tests">
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
+    <!-- Apache-2.0; net8.0 -->
+    <PackageVersion Include="xunit.v3" Version="3.2.2" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <!-- BSD-3-Clause; net8.0 -->
+    <PackageVersion Include="Shouldly" Version="4.3.0" />
+    <!-- MIT; net8.0/net10.0 -->
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.15.0" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Pure domain: entities, enums and rules. No infrastructure packages. -->
+  <ItemGroup>
+    <PackageReference Include="UUIDNext" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="EProshno.UnitTests" />
+  </ItemGroup>
+</Project>
