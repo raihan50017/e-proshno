@@ -1,13 +1,18 @@
 import * as React from 'react'
 import {
   AlertCircle,
+  Check,
   CheckCircle,
   Clock,
   Download,
   Eye,
   FileSpreadsheet,
   FileText,
+  ListPlus,
+  Plus,
   RotateCcw,
+  Send,
+  Trash2,
   Upload,
   UploadCloud,
 } from 'lucide-react'
@@ -24,6 +29,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
   Table,
@@ -43,6 +49,16 @@ import { useListLevels, useListSubjects, useListChapters } from '@/lib/api/gener
 import type { ImportJobDto, ImportRowDto, LevelDto, SubjectDto, ChapterDto, BankDto } from '@/lib/api/model'
 import { apiClient } from '@/lib/api-client'
 import { formatDateBn, toBnDigits } from '@/lib/bn'
+
+interface StagedQuestion {
+  id: string
+  title: string
+  type: number // 0 = Mcq, 1 = Cq
+  options?: string[]
+  correctOption?: 'ক' | 'খ' | 'গ' | 'ঘ'
+  explanation?: string
+  cqParts?: { prompt: string; marks: number }[]
+}
 
 export function ImportsPage() {
   const { data: banksData, isLoading: banksLoading } = useListBanks()
@@ -100,8 +116,28 @@ export function ImportsPage() {
   const [questionType, setQuestionType] = React.useState<number>(0) // 0 = Mcq, 1 = Cq
   const [difficulty, setDifficulty] = React.useState<number>(2) // 1=Easy, 2=Medium, 3=Hard
 
-  // Input states
-  const [activeImportTab, setActiveImportTab] = React.useState<'paste' | 'file'>('paste')
+  // Input states: Structured Form vs Paste vs File
+  const [activeImportTab, setActiveImportTab] = React.useState<'form' | 'paste' | 'file'>('form')
+
+  // Structured Form Input Fields (Separated Inputs)
+  const [formTitle, setFormTitle] = React.useState('')
+  const [formOptionA, setFormOptionA] = React.useState('')
+  const [formOptionB, setFormOptionB] = React.useState('')
+  const [formOptionC, setFormOptionC] = React.useState('')
+  const [formOptionD, setFormOptionD] = React.useState('')
+  const [formCorrectOption, setFormCorrectOption] = React.useState<'ক' | 'খ' | 'গ' | 'ঘ'>('ক')
+  const [formExplanation, setFormExplanation] = React.useState('')
+
+  // CQ Form Input Fields
+  const [cqPartA, setCqPartA] = React.useState('')
+  const [cqPartB, setCqPartB] = React.useState('')
+  const [cqPartC, setCqPartC] = React.useState('')
+  const [cqPartD, setCqPartD] = React.useState('')
+
+  // Staged Questions Queue
+  const [stagedQuestions, setStagedQuestions] = React.useState<StagedQuestion[]>([])
+
+  // Bulk Paste & File states
   const [pasteContent, setPasteContent] = React.useState('')
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null)
   const [isUploading, setIsUploading] = React.useState(false)
@@ -180,6 +216,197 @@ export function ImportsPage() {
     }
     const typeStr = questionType === 0 ? 'Mcq' : 'Cq'
     window.open(`/api/v1/imports/templates/${typeStr}?subjectId=${selectedSubjectId}`, '_blank')
+  }
+
+  // Format a Staged Question into TextParser format
+  const formatStagedQuestion = (q: StagedQuestion, index: number): string => {
+    if (q.type === 0 && q.options) {
+      const letters = ['ক', 'খ', 'গ', 'ঘ']
+      const optionsText = q.options
+        .map((opt, i) => `${letters[i]}) ${opt}`)
+        .join('\n')
+      let result = `${toBnDigits(index + 1)}. ${q.title}\n${optionsText}\nউত্তর: ${q.correctOption || 'ক'}`
+      if (q.explanation && q.explanation.trim()) {
+        result += `\nব্যাখ্যা: ${q.explanation.trim()}`
+      }
+      return result
+    } else if (q.type === 1 && q.cqParts) {
+      const letters = ['ক', 'খ', 'গ', 'ঘ']
+      let result = `সৃজনশীল ${toBnDigits(index + 1)}. ${q.title}\n`
+      result += q.cqParts.map((p, i) => `${letters[i]}. ${p.prompt} [${toBnDigits(p.marks)}]`).join('\n')
+      return result
+    }
+    return ''
+  }
+
+  // Stage a single question from structured inputs
+  const handleStageQuestion = (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+
+    if (!formTitle.trim()) {
+      toast.error('প্রশ্নের শিরোনাম / মূলভাব লিখুন')
+      return
+    }
+
+    if (questionType === 0) {
+      if (!formOptionA.trim() || !formOptionB.trim() || !formOptionC.trim() || !formOptionD.trim()) {
+        toast.error('ক, খ, গ, ঘ চারটি অপশনই পূরণ করুন')
+        return
+      }
+
+      const newQ: StagedQuestion = {
+        id: crypto.randomUUID(),
+        title: formTitle.trim(),
+        type: 0,
+        options: [formOptionA.trim(), formOptionB.trim(), formOptionC.trim(), formOptionD.trim()],
+        correctOption: formCorrectOption,
+        explanation: formExplanation.trim() || undefined,
+      }
+
+      setStagedQuestions((prev) => [...prev, newQ])
+      setFormTitle('')
+      setFormOptionA('')
+      setFormOptionB('')
+      setFormOptionC('')
+      setFormOptionD('')
+      setFormExplanation('')
+      toast.success('প্রশ্নটি প্রস্তুত তালিকায় যুক্ত হয়েছে!')
+    } else {
+      if (!cqPartA.trim() || !cqPartB.trim() || !cqPartC.trim() || !cqPartD.trim()) {
+        toast.error('সৃজনশীল প্রশ্নের ক, খ, গ, ঘ চারটি অংশই লিখুন')
+        return
+      }
+
+      const newQ: StagedQuestion = {
+        id: crypto.randomUUID(),
+        title: formTitle.trim(),
+        type: 1,
+        cqParts: [
+          { prompt: cqPartA.trim(), marks: 1 },
+          { prompt: cqPartB.trim(), marks: 2 },
+          { prompt: cqPartC.trim(), marks: 3 },
+          { prompt: cqPartD.trim(), marks: 4 },
+        ],
+      }
+
+      setStagedQuestions((prev) => [...prev, newQ])
+      setFormTitle('')
+      setCqPartA('')
+      setCqPartB('')
+      setCqPartC('')
+      setCqPartD('')
+      toast.success('সৃজনশীল প্রশ্নটি প্রস্তুত তালিকায় যুক্ত হয়েছে!')
+    }
+  }
+
+  // Submit currently filled question or all staged questions directly to backend
+  const handleImportStructured = async (importAllStaged: boolean = false) => {
+    if (!selectedBankId) {
+      toast.error('টার্গেট প্রশ্নব্যাংক নির্বাচন করুন')
+      return
+    }
+    if (!selectedLevelId || !selectedSubjectId) {
+      toast.error('শ্রেণি ও বিষয় নির্বাচন করুন')
+      return
+    }
+
+    let questionsToSubmit: StagedQuestion[] = []
+
+    if (importAllStaged) {
+      if (stagedQuestions.length === 0) {
+        toast.error('প্রস্তুত তালিকায় কোনো প্রশ্ন নেই')
+        return
+      }
+      questionsToSubmit = [...stagedQuestions]
+    } else {
+      // Single question direct submit
+      if (!formTitle.trim()) {
+        toast.error('প্রশ্নের শিরোনাম / মূলভাব লিখুন')
+        return
+      }
+
+      if (questionType === 0) {
+        if (!formOptionA.trim() || !formOptionB.trim() || !formOptionC.trim() || !formOptionD.trim()) {
+          toast.error('ক, খ, গ, ঘ চারটি অপশনই পূরণ করুন')
+          return
+        }
+
+        questionsToSubmit = [
+          {
+            id: crypto.randomUUID(),
+            title: formTitle.trim(),
+            type: 0,
+            options: [formOptionA.trim(), formOptionB.trim(), formOptionC.trim(), formOptionD.trim()],
+            correctOption: formCorrectOption,
+            explanation: formExplanation.trim() || undefined,
+          },
+        ]
+      } else {
+        if (!cqPartA.trim() || !cqPartB.trim() || !cqPartC.trim() || !cqPartD.trim()) {
+          toast.error('সৃজনশীল প্রশ্নের ক, খ, গ, ঘ চারটি অংশই লিখুন')
+          return
+        }
+
+        questionsToSubmit = [
+          {
+            id: crypto.randomUUID(),
+            title: formTitle.trim(),
+            type: 1,
+            cqParts: [
+              { prompt: cqPartA.trim(), marks: 1 },
+              { prompt: cqPartB.trim(), marks: 2 },
+              { prompt: cqPartC.trim(), marks: 3 },
+              { prompt: cqPartD.trim(), marks: 4 },
+            ],
+          },
+        ]
+      }
+    }
+
+    const formattedPayload = questionsToSubmit
+      .map((q, idx) => formatStagedQuestion(q, idx))
+      .join('\n\n')
+
+    setIsUploading(true)
+    try {
+      await apiClient.post('/api/v1/imports', {
+        bankId: selectedBankId,
+        sourceType: 0, // Paste
+        text: formattedPayload,
+        defaults: {
+          levelId: selectedLevelId,
+          subjectId: selectedSubjectId,
+          chapterId: selectedChapterId || undefined,
+          type: questionType,
+          difficulty,
+        },
+      })
+
+      toast.success(
+        `${toBnDigits(questionsToSubmit.length)} টি প্রশ্ন সফলভাবে সিস্টেমে যুক্ত হয়েছে! ইতিহাস ট্যাবে প্রাকদর্শন দেখুন।`
+      )
+
+      if (importAllStaged) {
+        setStagedQuestions([])
+      } else {
+        setFormTitle('')
+        setFormOptionA('')
+        setFormOptionB('')
+        setFormOptionC('')
+        setFormOptionD('')
+        setFormExplanation('')
+        setCqPartA('')
+        setCqPartB('')
+        setCqPartC('')
+        setCqPartD('')
+      }
+
+      refetchImports()
+    } catch {
+      toast.error('প্রশ্ন ইমপোর্ট করতে সমস্যা হয়েছে')
+    } finally {
+      setIsUploading(false)
+    }
   }
 
   const handlePasteSubmit = async (e: React.FormEvent) => {
@@ -346,7 +573,7 @@ export function ImportsPage() {
     <div className="space-y-6">
       <PageHeader
         title="প্রশ্ন ইমপোর্ট ও ইতিহাস"
-        description="Excel, CSV বা সরাসরি টেক্সট পেস্ট করে পাইকারি প্রশ্ন আপলোড ও ব্যাংকে যুক্ত করুন"
+        description="পৃথক ইনপুট ফিল্ড, সরাসরি টেক্সট পেস্ট বা Excel ফাইল থেকে সহজে ব্যাংকে প্রশ্ন যুক্ত করুন"
         breadcrumbs={[
           { label: 'ড্যাশবোর্ড', href: '/dashboard' },
           { label: 'প্রশ্ন ইমপোর্ট' },
@@ -375,10 +602,10 @@ export function ImportsPage() {
           </TabsTrigger>
         </TabsList>
 
-        {/* Tab 1: Upload / Paste */}
+        {/* Tab 1: Upload / Input / Paste */}
         <TabsContent value="upload" className="space-y-6">
           <div className="grid gap-6 lg:grid-cols-3">
-            {/* Left Upload Form (2 cols) */}
+            {/* Left Column: Config + Form (2 cols) */}
             <div className="lg:col-span-2 space-y-6">
               {/* Target & Taxonomy Configuration */}
               <Card className="border-border">
@@ -505,32 +732,395 @@ export function ImportsPage() {
                 </CardContent>
               </Card>
 
-              {/* Mode Selection Tabs: Paste vs File */}
-              <Tabs value={activeImportTab} onValueChange={(v: any) => setActiveImportTab(v)} className="space-y-4">
-                <TabsList className="bg-muted/60 p-1 w-full grid grid-cols-2">
+              {/* Mode Selection Tabs: Structured Form vs Paste vs File */}
+              <Tabs
+                value={activeImportTab}
+                onValueChange={(v: any) => setActiveImportTab(v)}
+                className="space-y-4"
+              >
+                <TabsList className="bg-muted/60 p-1 w-full grid grid-cols-3">
+                  <TabsTrigger value="form" className="text-xs gap-1.5 font-medium">
+                    <ListPlus className="size-3.5" />
+                    আলাদা ইনপুট ফিল্ড (ফর্ম)
+                  </TabsTrigger>
                   <TabsTrigger value="paste" className="text-xs gap-1.5">
                     <FileText className="size-3.5" />
-                    সরাসরি পেস্ট করুন (Word / Text)
+                    সরাসরি পেস্ট (Word/Text)
                   </TabsTrigger>
                   <TabsTrigger value="file" className="text-xs gap-1.5">
                     <FileSpreadsheet className="size-3.5" />
-                    Excel / CSV ফাইল আপলোড
+                    Excel / CSV আপলোড
                   </TabsTrigger>
                 </TabsList>
 
-                {/* Paste Mode */}
+                {/* Mode 1: Structured Form with Separate Inputs for Title & Options */}
+                <TabsContent value="form" className="space-y-4">
+                  <Card className="border-border">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-base font-semibold flex items-center gap-2">
+                          <span>২. প্রশ্নের তথ্য ও অপশন ইনপুট</span>
+                          <Badge variant="secondary" className="text-[11px]">
+                            {questionType === 0 ? 'MCQ প্রশ্ন' : 'সৃজনশীল প্রশ্ন'}
+                          </Badge>
+                        </CardTitle>
+                      </div>
+                      <CardDescription className="text-xs leading-relaxed">
+                        শিরোনাম ও প্রতিটি অপশনের জন্য আলাদা ফিল্ডে তথ্য পূরণ করুন
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* Separate Title / Stem Input */}
+                      <div className="space-y-2">
+                        <Label htmlFor="qTitle" className="text-xs font-semibold text-foreground">
+                          প্রশ্নের শিরোনাম / মূলভাব (Title / Stem) *
+                        </Label>
+                        <textarea
+                          id="qTitle"
+                          rows={3}
+                          value={formTitle}
+                          onChange={(e) => setFormTitle(e.target.value)}
+                          placeholder={
+                            questionType === 0
+                              ? 'যেমন: কোনো বস্তুর ভরবেগ দ্বিগুণ করা হলে গতিশক্তি কত গুণ হবে?'
+                              : 'উদ্দীপক: একটি বস্তু ১০ মিটার উপর থেকে মুক্তভাবে পড়তে লাগল...'
+                          }
+                          className="w-full rounded-md border border-input bg-background p-3 text-xs leading-relaxed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring font-sans"
+                        />
+                      </div>
+
+                      {/* Separate Option Fields for MCQ */}
+                      {questionType === 0 ? (
+                        <div className="space-y-3 pt-1">
+                          <Label className="text-xs font-semibold text-foreground block">
+                            অপশনসমূহ (Separate Options) *
+                          </Label>
+
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            {/* Option A */}
+                            <div className="space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <Label htmlFor="optA" className="text-[11px] text-muted-foreground font-medium">
+                                  অপশন (ক)
+                                </Label>
+                                {formCorrectOption === 'ক' && (
+                                  <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-0.5">
+                                    <Check className="size-3" /> সঠিক উত্তর
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex rounded-md shadow-2xs">
+                                <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted/60 text-xs font-bold text-foreground">
+                                  ক
+                                </span>
+                                <Input
+                                  id="optA"
+                                  placeholder="অপশন ক এর উত্তর লিখুন..."
+                                  value={formOptionA}
+                                  onChange={(e) => setFormOptionA(e.target.value)}
+                                  className="rounded-l-none text-xs"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Option B */}
+                            <div className="space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <Label htmlFor="optB" className="text-[11px] text-muted-foreground font-medium">
+                                  অপশন (খ)
+                                </Label>
+                                {formCorrectOption === 'খ' && (
+                                  <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-0.5">
+                                    <Check className="size-3" /> সঠিক উত্তর
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex rounded-md shadow-2xs">
+                                <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted/60 text-xs font-bold text-foreground">
+                                  খ
+                                </span>
+                                <Input
+                                  id="optB"
+                                  placeholder="অপশন খ এর উত্তর লিখুন..."
+                                  value={formOptionB}
+                                  onChange={(e) => setFormOptionB(e.target.value)}
+                                  className="rounded-l-none text-xs"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Option C */}
+                            <div className="space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <Label htmlFor="optC" className="text-[11px] text-muted-foreground font-medium">
+                                  অপশন (গ)
+                                </Label>
+                                {formCorrectOption === 'গ' && (
+                                  <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-0.5">
+                                    <Check className="size-3" /> সঠিক উত্তর
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex rounded-md shadow-2xs">
+                                <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted/60 text-xs font-bold text-foreground">
+                                  গ
+                                </span>
+                                <Input
+                                  id="optC"
+                                  placeholder="অপশন গ এর উত্তর লিখুন..."
+                                  value={formOptionC}
+                                  onChange={(e) => setFormOptionC(e.target.value)}
+                                  className="rounded-l-none text-xs"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Option D */}
+                            <div className="space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <Label htmlFor="optD" className="text-[11px] text-muted-foreground font-medium">
+                                  অপশন (ঘ)
+                                </Label>
+                                {formCorrectOption === 'ঘ' && (
+                                  <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-0.5">
+                                    <Check className="size-3" /> সঠিক উত্তর
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex rounded-md shadow-2xs">
+                                <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted/60 text-xs font-bold text-foreground">
+                                  ঘ
+                                </span>
+                                <Input
+                                  id="optD"
+                                  placeholder="অপশন ঘ এর উত্তর লিখুন..."
+                                  value={formOptionD}
+                                  onChange={(e) => setFormOptionD(e.target.value)}
+                                  className="rounded-l-none text-xs"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Correct Option Selector */}
+                          <div className="pt-2 space-y-1.5">
+                            <Label className="text-xs font-medium text-foreground">
+                              সঠিক উত্তর নির্ধারণ করুন *
+                            </Label>
+                            <div className="flex gap-2">
+                              {(['ক', 'খ', 'গ', 'ঘ'] as const).map((opt) => (
+                                <button
+                                  key={opt}
+                                  type="button"
+                                  onClick={() => setFormCorrectOption(opt)}
+                                  className={`flex-1 py-2 rounded-md border text-xs font-bold transition-all ${
+                                    formCorrectOption === opt
+                                      ? 'border-emerald-600 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 ring-2 ring-emerald-500/20'
+                                      : 'border-input bg-background hover:bg-muted/60 text-muted-foreground'
+                                  }`}
+                                >
+                                  {opt}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Explanation Field */}
+                          <div className="pt-2 space-y-1.5">
+                            <Label htmlFor="qExpl" className="text-xs font-medium text-muted-foreground">
+                              উত্তরের ব্যাখ্যা (ঐচ্ছিক)
+                            </Label>
+                            <Input
+                              id="qExpl"
+                              placeholder="যেমন: E = p^2 / 2m সূত্রে p দ্বিগুণ হলে গতিশক্তি ৪ গুণ হয়।"
+                              value={formExplanation}
+                              onChange={(e) => setFormExplanation(e.target.value)}
+                              className="text-xs"
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        /* CQ Parts (ক, খ, গ, ঘ) */
+                        <div className="space-y-3 pt-1">
+                          <Label className="text-xs font-semibold text-foreground block">
+                            সৃজনশীল প্রশ্ন অংশসমূহ (CQ Parts) *
+                          </Label>
+
+                          <div className="space-y-2.5">
+                            <div className="space-y-1">
+                              <Label className="text-[11px] text-muted-foreground">
+                                ক. জ্ঞানমূলক (১ নম্বর) *
+                              </Label>
+                              <Input
+                                placeholder="ক অংশের প্রশ্ন..."
+                                value={cqPartA}
+                                onChange={(e) => setCqPartA(e.target.value)}
+                                className="text-xs"
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <Label className="text-[11px] text-muted-foreground">
+                                খ. অনুধাবনমূলক (২ নম্বর) *
+                              </Label>
+                              <Input
+                                placeholder="খ অংশের প্রশ্ন..."
+                                value={cqPartB}
+                                onChange={(e) => setCqPartB(e.target.value)}
+                                className="text-xs"
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <Label className="text-[11px] text-muted-foreground">
+                                গ. প্রয়োগমূলক (৩ নম্বর) *
+                              </Label>
+                              <Input
+                                placeholder="গ অংশের প্রশ্ন..."
+                                value={cqPartC}
+                                onChange={(e) => setCqPartC(e.target.value)}
+                                className="text-xs"
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <Label className="text-[11px] text-muted-foreground">
+                                ঘ. উচ্চতর দক্ষতামূলক (৪ নম্বর) *
+                              </Label>
+                              <Input
+                                placeholder="ঘ অংশের প্রশ্ন..."
+                                value={cqPartD}
+                                onChange={(e) => setCqPartD(e.target.value)}
+                                className="text-xs"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Action Buttons */}
+                      <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="gap-1.5 text-xs"
+                          onClick={handleStageQuestion}
+                        >
+                          <Plus className="size-3.5" />
+                          তালিকায় যোগ করুন (+)
+                        </Button>
+
+                        <Button
+                          type="button"
+                          loading={isUploading}
+                          loadingText="যুক্ত হচ্ছে..."
+                          onClick={() => handleImportStructured(false)}
+                          className="gap-2 text-xs"
+                        >
+                          <Send className="size-3.5" />
+                          সরাসরি ব্যাংকে পাঠান
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Staged Questions List Queue */}
+                  {stagedQuestions.length > 0 && (
+                    <Card className="border-primary/30 bg-primary/[0.01]">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                            <ListPlus className="size-4 text-primary" />
+                            প্রস্তুতকৃত প্রশ্নতালিকা ({toBnDigits(stagedQuestions.length)}টি প্রশ্ন)
+                          </CardTitle>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs text-destructive hover:bg-destructive/10"
+                            onClick={() => setStagedQuestions([])}
+                          >
+                            সকল মুছুন
+                          </Button>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                          {stagedQuestions.map((q, qIdx) => (
+                            <div
+                              key={q.id}
+                              className="p-3 rounded-lg border border-border bg-card text-xs space-y-1.5"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <span className="font-semibold text-foreground line-clamp-1">
+                                  {toBnDigits(qIdx + 1)}. {q.title}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setStagedQuestions((prev) => prev.filter((item) => item.id !== q.id))
+                                  }
+                                  className="text-muted-foreground hover:text-destructive p-1"
+                                >
+                                  <Trash2 className="size-3.5" />
+                                </button>
+                              </div>
+
+                              {q.type === 0 && q.options && (
+                                <div className="grid grid-cols-2 gap-1 text-[11px] text-muted-foreground pt-0.5">
+                                  {q.options.map((opt, oIdx) => (
+                                    <span
+                                      key={oIdx}
+                                      className={`truncate ${
+                                        ['ক', 'খ', 'গ', 'ঘ'][oIdx] === q.correctOption
+                                          ? 'text-emerald-600 font-semibold'
+                                          : ''
+                                      }`}
+                                    >
+                                      {['ক', 'খ', 'গ', 'ঘ'][oIdx]}. {opt}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+
+                              {q.explanation && (
+                                <p className="text-[10px] text-muted-foreground/80 italic">
+                                  ব্যাখ্যা: {q.explanation}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="pt-2 border-t border-border flex justify-end">
+                          <Button
+                            type="button"
+                            loading={isUploading}
+                            loadingText="ইমপোর্ট হচ্ছে..."
+                            onClick={() => handleImportStructured(true)}
+                            className="gap-2 text-xs"
+                          >
+                            <CheckCircle className="size-4" />
+                            সকল প্রস্তুত প্রশ্ন ({toBnDigits(stagedQuestions.length)}টি) একসাথে ইমপোর্ট করুন
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </TabsContent>
+
+                {/* Mode 2: Bulk Text Paste */}
                 <TabsContent value="paste">
                   <Card className="border-border">
                     <form onSubmit={handlePasteSubmit}>
                       <CardHeader className="pb-3">
-                        <CardTitle className="text-base font-semibold">২. প্রশ্ন টেক্সট পেস্ট করুন</CardTitle>
+                        <CardTitle className="text-base font-semibold">২. বাল্ক প্রশ্ন টেক্সট পেস্ট করুন</CardTitle>
                         <CardDescription className="text-xs leading-relaxed">
-                          ক্রমিক নম্বর, ক খ গ ঘ অপশন এবং &quot;উত্তর: গ&quot; লাইনসহ প্রশ্ন পেস্ট করুন
+                          Word বা PDF থেকে একাধিক প্রশ্ন ক্রমিক নম্বর, অপশন এবং &quot;উত্তর: গ&quot; লাইনসহ পেস্ট করুন
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-3">
                         <textarea
-                          className="w-full min-h-[220px] rounded-md border border-input bg-background p-3 text-xs leading-relaxed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring font-sans"
+                          className="w-full min-h-[240px] rounded-md border border-input bg-background p-3 text-xs leading-relaxed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring font-sans"
                           placeholder={`১. কোনো বস্তুর ভরবেগ দ্বিগুণ করা হলে গতিশক্তি কত গুণ হবে?
 ক) ২ গুণ
 খ) ৪ গুণ
@@ -557,7 +1147,7 @@ export function ImportsPage() {
                   </Card>
                 </TabsContent>
 
-                {/* File Upload Mode */}
+                {/* Mode 3: File Upload */}
                 <TabsContent value="file">
                   <Card className="border-border">
                     <form onSubmit={handleFileUploadSubmit}>
@@ -618,15 +1208,14 @@ export function ImportsPage() {
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
                     <FileSpreadsheet className="size-4 text-emerald-600" />
-                    ইমপোর্ট নিয়মাবলী ও নির্দেশিকা
+                    ইমপোর্ট নির্দেশিকা
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="text-xs space-y-2.5 text-muted-foreground leading-relaxed">
-                  <p>• প্রতিটি ফাইলে সর্বাধিক <strong>৫,০০০</strong> টি প্রশ্ন একবারে আপলোড করা যাবে।</p>
-                  <p>• MCQ উত্তরে ক, খ, গ, ঘ অথবা A, B, C, D গ্রহণযোগ্য।</p>
-                  <p>• প্রশ্নের ভেতর গাণিতিক সূত্র বা সমীকরণ থাকলে KaTeX বা LaTeX ফরম্যাটে লিখুন।</p>
-                  <p>• আপলোডের পর সিস্টেম স্বয়ংক্রিয়ভাবে যাচাই করবে। ত্রুটিমুক্ত প্রশ্নসমূহ এক ক্লিকে কমিট করে ব্যাংকে যোগ করতে পারবেন।</p>
-                  <p>• কোনো ভুল ইমপোর্ট হলে সম্পন্ন হওয়ার ৭ দিনের মধ্যে রোলব্যাক করতে পারবেন।</p>
+                  <p>• <strong>আলাদা ফিল্ডে ইনপুট:</strong> প্রশ্ন শিরোনাম, ৪টি অপশন এবং সঠিক উত্তর আলাদা আলাদা ফিল্ডে টাইপ করে সহজে প্রশ্ন তৈরি করুন।</p>
+                  <p>• <strong>ব্যাচ কিউ:</strong> &quot;তালিকায় যোগ করুন&quot; বোতাম চেপে একাধিক প্রশ্ন সাজিয়ে একসাথে ব্যাংকে জমা দিতে পারবেন।</p>
+                  <p>• <strong>বাল্ক পেস্ট:</strong> Word বা PDF ফাইল থেকে সরাসরি প্রশ্ন ও অপশন পেস্ট করে আমদানি করুন।</p>
+                  <p>• <strong>Excel আপলোড:</strong> অফিশিয়াল টেমপ্লেটে একসাথে ৫,০০০ পর্যন্ত প্রশ্ন আপলোড করুন।</p>
                   <div className="pt-2">
                     <Button
                       variant="outline"
@@ -635,7 +1224,7 @@ export function ImportsPage() {
                       onClick={handleDownloadTemplate}
                     >
                       <Download className="size-3.5" />
-                      Excel টেমপ্লেট ডাউনলোড করুন
+                      Excel টেমপ্লেট ডাউনলোড
                     </Button>
                   </div>
                 </CardContent>
@@ -745,7 +1334,7 @@ export function ImportsPage() {
                   <EmptyState
                     icon={UploadCloud}
                     title="এখনও কোনো ইমপোর্ট করা হয়নি"
-                    description="Excel ফাইল আপলোড বা সরাসরি প্রশ্ন পেস্ট করে দ্রুত আপনার ব্যাংকে প্রশ্ন যোগ করুন।"
+                    description="ফর্ম থেকে পৃথক ফিল্ডে প্রশ্ন ইনপুট, Excel ফাইল আপলোড বা সরাসরি টেক্সট পেস্ট করে দ্রুত প্রশ্ন যোগ করুন।"
                   />
                 </div>
               )}
