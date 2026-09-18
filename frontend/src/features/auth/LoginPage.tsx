@@ -33,14 +33,34 @@ export function LoginPage() {
 
     setIsSubmitting(true)
     try {
-      await login({ phoneOrEmail: phoneOrEmail.trim(), password })
-      toast.success('সফলভাবে লগইন সম্পন্ন হয়েছে!')
-      navigate(from, { replace: true })
+      const result = await login({ loginId: phoneOrEmail.trim(), password })
+      if (result.otpRequired) {
+        toast.info(`আপনার নম্বরে (${result.phone}) একটি ওটিপি কোড পাঠানো হয়েছে।`)
+      } else {
+        toast.success('সফলভাবে লগইন সম্পন্ন হয়েছে!')
+        navigate(from, { replace: true })
+      }
     } catch (err: any) {
-      const errorMsg =
-        err?.response?.data?.detail ||
-        err?.response?.data?.message ||
-        'লগইন ব্যর্থ হয়েছে। মোবাইল নম্বর বা পাসওয়ার্ড সঠিক কিনা পরীক্ষা করুন।'
+      const data = err?.response?.data
+      let errorMsg = ''
+      if (data?.errors && typeof data.errors === 'object') {
+        const errorEntries = Object.values(data.errors)
+        if (errorEntries.length > 0) {
+          const firstError = errorEntries[0]
+          if (Array.isArray(firstError) && firstError.length > 0) {
+            errorMsg = firstError[0]
+          } else if (typeof firstError === 'string') {
+            errorMsg = firstError
+          }
+        }
+      }
+      if (!errorMsg) {
+        errorMsg =
+          data?.title ||
+          data?.detail ||
+          data?.message ||
+          'লগইন ব্যর্থ হয়েছে। মোবাইল নম্বর বা পাসওয়ার্ড সঠিক কিনা পরীক্ষা করুন।'
+      }
       toast.error(errorMsg)
     } finally {
       setIsSubmitting(false)
@@ -49,11 +69,11 @@ export function LoginPage() {
 
   const fillDemo = (userType: 'teacher' | 'admin') => {
     if (userType === 'teacher') {
-      setPhoneOrEmail('01711000001')
-      setPassword('Teacher@123')
+      setPhoneOrEmail('teacher@example.com')
+      setPassword('Teacher12345')
     } else {
-      setPhoneOrEmail('01711000000')
-      setPassword('Admin@123')
+      setPhoneOrEmail('admin@example.com')
+      setPassword('Admin12345')
     }
   }
 
@@ -91,7 +111,7 @@ export function LoginPage() {
                 <Input
                   id="phoneOrEmail"
                   type="text"
-                  placeholder="যেমন: 01711000001 বা teacher@eproshno.bd"
+                  placeholder="যেমন: teacher@example.com বা +8801700000002"
                   value={phoneOrEmail}
                   onChange={(e) => setPhoneOrEmail(e.target.value)}
                   disabled={isSubmitting}
@@ -158,21 +178,27 @@ export function LoginPage() {
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-8 text-xs flex-1 gap-1.5"
+                className="h-auto py-1.5 text-xs flex-1 flex-col items-start gap-0.5"
                 onClick={() => fillDemo('teacher')}
               >
-                <School className="size-3.5" />
-                শিক্ষক (Teacher)
+                <div className="flex items-center gap-1.5 font-medium text-foreground">
+                  <School className="size-3.5 text-primary" />
+                  শিক্ষক (Teacher)
+                </div>
+                <span className="text-[10px] text-muted-foreground">teacher@example.com</span>
               </Button>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-8 text-xs flex-1 gap-1.5"
+                className="h-auto py-1.5 text-xs flex-1 flex-col items-start gap-0.5"
                 onClick={() => fillDemo('admin')}
               >
-                <ShieldCheck className="size-3.5" />
-                অ্যাডমিন (Admin)
+                <div className="flex items-center gap-1.5 font-medium text-foreground">
+                  <ShieldCheck className="size-3.5 text-primary" />
+                  অ্যাডমিন (Admin)
+                </div>
+                <span className="text-[10px] text-muted-foreground">admin@example.com</span>
               </Button>
             </div>
           </div>

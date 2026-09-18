@@ -1,5 +1,6 @@
 import * as React from 'react'
-import { apiClient, setAccessToken } from '@/lib/api-client'
+import { apiClient, getAccessToken, setAccessToken } from '@/lib/api-client'
+import type { AuthStepResponse } from '@/lib/api/model/authStepResponse'
 import type { InstitutionMembershipDto } from '@/lib/api/model/institutionMembershipDto'
 import type { MeResponse } from '@/lib/api/model/meResponse'
 import type { SessionResponse } from '@/lib/api/model/sessionResponse'
@@ -10,7 +11,7 @@ interface AuthContextType {
   institutions: InstitutionMembershipDto[]
   isAuthenticated: boolean
   isLoading: boolean
-  login: (body: { phoneOrEmail: string; password?: string; otp?: string }) => Promise<SessionResponse>
+  login: (body: { loginId?: string; phoneOrEmail?: string; password: string }) => Promise<AuthStepResponse>
   logout: () => Promise<void>
   switchInstitution: (institutionId: string) => Promise<void>
   refetchUser: () => Promise<void>
@@ -24,6 +25,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchCurrentUser = React.useCallback(async () => {
     try {
+      const token = getAccessToken()
+      if (!token) {
+        // Try refreshing with existing session cookie if token not in storage
+        try {
+          const refreshRes = await apiClient.post<SessionResponse>('/api/v1/auth/refresh', {})
+          if (refreshRes.data?.accessToken) {
+            setAccessToken(refreshRes.data.accessToken)
+            if (refreshRes.data.me) {
+              setUser(refreshRes.data.me)
+              return refreshRes.data.me
+            }
+          }
+        } catch {
+          setUser(null)
+          return null
+        }
+      }
+
       const res = await apiClient.get<MeResponse>('/api/v1/me')
       setUser(res.data)
       return res.data
@@ -49,18 +68,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [fetchCurrentUser])
 
-  const login = async (body: { phoneOrEmail: string; password?: string; otp?: string }): Promise<SessionResponse> => {
+  const login = async (body: { loginId?: string; phoneOrEmail?: string; password: string }): Promise<AuthStepResponse> => {
     setIsLoading(true)
     try {
-      const res = await apiClient.post<SessionResponse>('/api/v1/auth/login', body)
-      if (res.data?.accessToken) {
-        setAccessToken(res.data.accessToken)
+      const loginId = (body.loginId || body.phoneOrEmail || '').trim()
+      const res = await apiClient.post<AuthStepResponse>('/api/v1/auth/login', {
+        loginId,
+        password: body.password,
+      })
+
+      const session = res.data?.session
+      if (session?.accessToken) {
+        setAccessToken(session.accessToken)
       }
-      if (res.data?.me) {
-        setUser(res.data.me)
-      } else {
+      if (session?.me) {
+        setUser(session.me)
+      } else if (session?.accessToken) {
         await fetchCurrentUser()
       }
+
       return res.data
     } finally {
       setIsLoading(false)
@@ -81,7 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const switchInstitution = async (institutionId: string) => {
     try {
       const res = await apiClient.post<SessionResponse>('/api/v1/auth/refresh', {
-        switchToInstitutionId: institutionId,
+        institutionId,
       })
       if (res.data?.accessToken) {
         setAccessToken(res.data.accessToken)

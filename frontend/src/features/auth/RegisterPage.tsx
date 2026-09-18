@@ -27,8 +27,8 @@ export function RegisterPage() {
       toast.error('মোবাইল নম্বর লিখুন')
       return
     }
-    if (!password || password.length < 6) {
-      toast.error('পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে')
+    if (!password || password.length < 8) {
+      toast.error('পাসওয়ার্ড কমপক্ষে ৮ অক্ষরের হতে হবে এবং বর্ণ ও সংখ্যা থাকতে হবে')
       return
     }
 
@@ -36,19 +36,34 @@ export function RegisterPage() {
     try {
       await apiClient.post('/api/v1/auth/register', {
         fullName: fullName.trim(),
-        phone: phone.trim(),
+        phone: phone.trim() || undefined,
         email: email.trim() || undefined,
         password,
-        institutionName: institutionName.trim() || undefined,
       })
 
       toast.success('নিবন্ধন সফল হয়েছে! অনুগ্রহ করে লগইন করুন।')
       navigate('/login')
     } catch (err: any) {
-      const errorMsg =
-        err?.response?.data?.detail ||
-        err?.response?.data?.message ||
-        'নিবন্ধন ব্যর্থ হয়েছে। সঠিক তথ্য প্রদান করুন।'
+      const data = err?.response?.data
+      let errorMsg = ''
+      if (data?.errors && typeof data.errors === 'object') {
+        const errorEntries = Object.values(data.errors)
+        if (errorEntries.length > 0) {
+          const firstError = errorEntries[0]
+          if (Array.isArray(firstError) && firstError.length > 0) {
+            errorMsg = firstError[0]
+          } else if (typeof firstError === 'string') {
+            errorMsg = firstError
+          }
+        }
+      }
+      if (!errorMsg) {
+        errorMsg =
+          data?.title ||
+          data?.detail ||
+          data?.message ||
+          'নিবন্ধন ব্যর্থ হয়েছে। সঠিক তথ্য প্রদান করুন।'
+      }
       toast.error(errorMsg)
     } finally {
       setIsSubmitting(false)
