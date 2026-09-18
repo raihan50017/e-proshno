@@ -18,3 +18,4 @@ This collection contains API requests for testing and exploring the **e-proshno*
 
 - **Platform Admin:** `admin@example.com` / `Admin12345` (SuperAdmin, ContentEditor)
 - **Teacher (Coaching Owner):** `teacher@example.com` / `Teacher12345` (Owner of "নমুনা কোচিং সেন্টার")
+
