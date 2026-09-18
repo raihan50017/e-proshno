@@ -1,6 +1,7 @@
 import * as React from 'react'
 import {
   AlertCircle,
+  ArrowLeft,
   Check,
   CheckCircle,
   Clock,
@@ -9,6 +10,7 @@ import {
   FileSpreadsheet,
   FileText,
   ListPlus,
+  Pencil,
   Plus,
   RotateCcw,
   Send,
@@ -152,6 +154,26 @@ export function ImportsPage() {
   const [rollbackJobId, setRollbackJobId] = React.useState<string | null>(null)
   const [isRollingBack, setIsRollingBack] = React.useState(false)
 
+  // Editing Row in Preview Modal
+  const [editingRow, setEditingRow] = React.useState<ImportRowDto | null>(null)
+  const [editStem, setEditStem] = React.useState('')
+  const [editOptionA, setEditOptionA] = React.useState('')
+  const [editOptionB, setEditOptionB] = React.useState('')
+  const [editOptionC, setEditOptionC] = React.useState('')
+  const [editOptionD, setEditOptionD] = React.useState('')
+  const [editCorrectRaw, setEditCorrectRaw] = React.useState<'ক' | 'খ' | 'গ' | 'ঘ' | string>('ক')
+  const [editExplanation, setEditExplanation] = React.useState('')
+  const [editCqPartA, setEditCqPartA] = React.useState('')
+  const [editCqPartB, setEditCqPartB] = React.useState('')
+  const [editCqPartC, setEditCqPartC] = React.useState('')
+  const [editCqPartD, setEditCqPartD] = React.useState('')
+  const [editExcluded, setEditExcluded] = React.useState(false)
+  const [isSavingRow, setIsSavingRow] = React.useState(false)
+  const [togglingRowId, setTogglingRowId] = React.useState<string | null>(null)
+
+  // Staged Question Editing in Structured Form
+  const [editingStagedId, setEditingStagedId] = React.useState<string | null>(null)
+
   React.useEffect(() => {
     if (banks.length > 0 && !selectedBankId) {
       setSelectedBankId(banks[0].id)
@@ -239,7 +261,43 @@ export function ImportsPage() {
     return ''
   }
 
-  // Stage a single question from structured inputs
+  // Edit a staged question from queue
+  const handleEditStaged = (q: StagedQuestion) => {
+    setEditingStagedId(q.id)
+    setFormTitle(q.title)
+    setQuestionType(q.type)
+    if (q.type === 0 && q.options) {
+      setFormOptionA(q.options[0] || '')
+      setFormOptionB(q.options[1] || '')
+      setFormOptionC(q.options[2] || '')
+      setFormOptionD(q.options[3] || '')
+      setFormCorrectOption(q.correctOption || 'ক')
+      setFormExplanation(q.explanation || '')
+    } else if (q.type === 1 && q.cqParts) {
+      setCqPartA(q.cqParts[0]?.prompt || '')
+      setCqPartB(q.cqParts[1]?.prompt || '')
+      setCqPartC(q.cqParts[2]?.prompt || '')
+      setCqPartD(q.cqParts[3]?.prompt || '')
+    }
+    toast.info('প্রশ্নটি সম্পাদনার জন্য ফর্মে লোড করা হয়েছে')
+  }
+
+  // Cancel staged editing
+  const handleCancelEditStaged = () => {
+    setEditingStagedId(null)
+    setFormTitle('')
+    setFormOptionA('')
+    setFormOptionB('')
+    setFormOptionC('')
+    setFormOptionD('')
+    setFormExplanation('')
+    setCqPartA('')
+    setCqPartB('')
+    setCqPartC('')
+    setCqPartD('')
+  }
+
+  // Stage or update a single question from structured inputs
   const handleStageQuestion = (e?: React.FormEvent) => {
     if (e) e.preventDefault()
 
@@ -255,7 +313,7 @@ export function ImportsPage() {
       }
 
       const newQ: StagedQuestion = {
-        id: crypto.randomUUID(),
+        id: editingStagedId || crypto.randomUUID(),
         title: formTitle.trim(),
         type: 0,
         options: [formOptionA.trim(), formOptionB.trim(), formOptionC.trim(), formOptionD.trim()],
@@ -263,14 +321,23 @@ export function ImportsPage() {
         explanation: formExplanation.trim() || undefined,
       }
 
-      setStagedQuestions((prev) => [...prev, newQ])
+      if (editingStagedId) {
+        setStagedQuestions((prev) =>
+          prev.map((item) => (item.id === editingStagedId ? newQ : item))
+        )
+        setEditingStagedId(null)
+        toast.success('প্রশ্নটি প্রস্তুত তালিকায় হালনাগাদ করা হয়েছে!')
+      } else {
+        setStagedQuestions((prev) => [...prev, newQ])
+        toast.success('প্রশ্নটি প্রস্তুত তালিকায় যুক্ত হয়েছে!')
+      }
+
       setFormTitle('')
       setFormOptionA('')
       setFormOptionB('')
       setFormOptionC('')
       setFormOptionD('')
       setFormExplanation('')
-      toast.success('প্রশ্নটি প্রস্তুত তালিকায় যুক্ত হয়েছে!')
     } else {
       if (!cqPartA.trim() || !cqPartB.trim() || !cqPartC.trim() || !cqPartD.trim()) {
         toast.error('সৃজনশীল প্রশ্নের ক, খ, গ, ঘ চারটি অংশই লিখুন')
@@ -278,7 +345,7 @@ export function ImportsPage() {
       }
 
       const newQ: StagedQuestion = {
-        id: crypto.randomUUID(),
+        id: editingStagedId || crypto.randomUUID(),
         title: formTitle.trim(),
         type: 1,
         cqParts: [
@@ -289,13 +356,22 @@ export function ImportsPage() {
         ],
       }
 
-      setStagedQuestions((prev) => [...prev, newQ])
+      if (editingStagedId) {
+        setStagedQuestions((prev) =>
+          prev.map((item) => (item.id === editingStagedId ? newQ : item))
+        )
+        setEditingStagedId(null)
+        toast.success('সৃজনশীল প্রশ্নটি প্রস্তুত তালিকায় হালনাগাদ করা হয়েছে!')
+      } else {
+        setStagedQuestions((prev) => [...prev, newQ])
+        toast.success('সৃজনশীল প্রশ্নটি প্রস্তুত তালিকায় যুক্ত হয়েছে!')
+      }
+
       setFormTitle('')
       setCqPartA('')
       setCqPartB('')
       setCqPartC('')
       setCqPartD('')
-      toast.success('সৃজনশীল প্রশ্নটি প্রস্তুত তালিকায় যুক্ত হয়েছে!')
     }
   }
 
@@ -505,6 +581,7 @@ export function ImportsPage() {
 
   const handleOpenPreview = async (job: ImportJobDto) => {
     setPreviewJob(job)
+    setEditingRow(null)
     setIsLoadingRows(true)
     try {
       const res = await apiClient.get<{ items: ImportRowDto[] }>(`/api/v1/imports/${job.id}/rows`)
@@ -513,6 +590,146 @@ export function ImportsPage() {
       toast.error('ইমপোর্ট করা প্রশ্নের রো লোড করতে সমস্যা হয়েছে')
     } finally {
       setIsLoadingRows(false)
+    }
+  }
+
+  const handleOpenEditRow = (row: ImportRowDto) => {
+    setEditingRow(row)
+    setEditStem(row.draft?.stem || row.draft?.stimulus || '')
+    if (row.draft?.type === 0) {
+      const opts = row.draft?.options || []
+      setEditOptionA(opts[0] || '')
+      setEditOptionB(opts[1] || '')
+      setEditOptionC(opts[2] || '')
+      setEditOptionD(opts[3] || '')
+      setEditCorrectRaw(row.draft?.correctRaw || 'ক')
+      setEditExplanation(row.draft?.explanation || '')
+    } else {
+      const parts = row.draft?.cqParts || []
+      setEditCqPartA(parts[0]?.prompt || '')
+      setEditCqPartB(parts[1]?.prompt || '')
+      setEditCqPartC(parts[2]?.prompt || '')
+      setEditCqPartD(parts[3]?.prompt || '')
+      setEditExplanation(row.draft?.explanation || '')
+    }
+    setEditExcluded(row.status === 4)
+  }
+
+  const handleToggleExclude = async (row: ImportRowDto) => {
+    if (!previewJob) return
+    const willExclude = row.status !== 4
+    setTogglingRowId(row.id)
+    try {
+      const res = await apiClient.patch<{
+        row: ImportRowDto
+        totals: any
+        affectedRowIds: string[]
+      }>(`/api/v1/imports/${previewJob.id}/rows/${row.id}`, {
+        excluded: willExclude,
+      })
+
+      const updatedRow = res.data.row
+      const updatedTotals = res.data.totals
+
+      setPreviewRows((prev) =>
+        prev.map((r) => (r.id === updatedRow.id ? updatedRow : r))
+      )
+      setPreviewJob((prev) => (prev ? { ...prev, totals: updatedTotals } : null))
+      refetchImports()
+
+      if (willExclude) {
+        toast.info(`সারি ${toBnDigits(row.rowNo)} ইমপোর্ট থেকে বাদ দেওয়া হয়েছে`)
+      } else {
+        toast.success(`সারি ${toBnDigits(row.rowNo)} পুনরায় অন্তর্ভুক্ত করা হয়েছে`)
+      }
+    } catch {
+      toast.error('অবস্থা পরিবর্তন করতে সমস্যা হয়েছে')
+    } finally {
+      setTogglingRowId(null)
+    }
+  }
+
+  const handleSaveEditRow = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    if (!previewJob || !editingRow) return
+
+    if (!editStem.trim()) {
+      toast.error('প্রশ্নের শিরোনাম / মূলভাব লিখুন')
+      return
+    }
+
+    setIsSavingRow(true)
+    try {
+      const isMcq = editingRow.draft?.type === 0
+      const updatedDraft: any = {
+        ...editingRow.draft,
+        stem: editStem.trim(),
+        explanation: editExplanation.trim() || undefined,
+      }
+
+      if (isMcq) {
+        if (!editOptionA.trim() || !editOptionB.trim() || !editOptionC.trim() || !editOptionD.trim()) {
+          toast.error('ক, খ, গ, ঘ চারটি অপশনই পূরণ করুন')
+          setIsSavingRow(false)
+          return
+        }
+        updatedDraft.options = [
+          editOptionA.trim(),
+          editOptionB.trim(),
+          editOptionC.trim(),
+          editOptionD.trim(),
+        ]
+        updatedDraft.correctRaw = editCorrectRaw
+      } else {
+        if (!editCqPartA.trim() || !editCqPartB.trim() || !editCqPartC.trim() || !editCqPartD.trim()) {
+          toast.error('সৃজনশীল প্রশ্নের ক, খ, গ, ঘ চারটি অংশই লিখুন')
+          setIsSavingRow(false)
+          return
+        }
+        updatedDraft.stimulus = editStem.trim()
+        updatedDraft.cqParts = [
+          { prompt: editCqPartA.trim(), marks: 1 },
+          { prompt: editCqPartB.trim(), marks: 2 },
+          { prompt: editCqPartC.trim(), marks: 3 },
+          { prompt: editCqPartD.trim(), marks: 4 },
+        ]
+      }
+
+      const res = await apiClient.patch<{
+        row: ImportRowDto
+        totals: any
+        affectedRowIds: string[]
+      }>(`/api/v1/imports/${previewJob.id}/rows/${editingRow.id}`, {
+        draft: updatedDraft,
+        excluded: editExcluded,
+      })
+
+      const updatedRow = res.data.row
+      const updatedTotals = res.data.totals
+
+      setPreviewRows((prev) =>
+        prev.map((r) => (r.id === updatedRow.id ? updatedRow : r))
+      )
+      setPreviewJob((prev) => (prev ? { ...prev, totals: updatedTotals } : null))
+      refetchImports()
+
+      if (updatedRow.status === 0) {
+        toast.success('প্রশ্নটি সফলভাবে সংশোধিত ও সঠিক হিসেবে চিহ্নিত হয়েছে!')
+      } else if (updatedRow.status === 4) {
+        toast.info('প্রশ্নটি ইমপোর্ট তালিকা থেকে বাদ দেওয়া হয়েছে।')
+      } else if (updatedRow.status === 1) {
+        toast.warning('প্রশ্নটি সংরক্ষিত হয়েছে, তবে কিছু সতর্কতা রয়েছে।')
+      } else if (updatedRow.status === 2) {
+        toast.error('প্রশ্নটি সংরক্ষিত হয়েছে, তবে এখনও কিছু ত্রুটি রয়ে গেছে।')
+      } else {
+        toast.success('প্রশ্নটি সফলভাবে সংরক্ষিত হয়েছে!')
+      }
+
+      setEditingRow(null)
+    } catch (err: any) {
+      toast.error(err?.response?.data?.title || 'প্রশ্ন হালনাগাদ করতে সমস্যা হয়েছে')
+    } finally {
+      setIsSavingRow(false)
     }
   }
 
@@ -566,6 +783,25 @@ export function ImportsPage() {
         return <Badge variant="destructive">রোলব্যাককৃত</Badge>
       default:
         return <Badge variant="secondary">প্রসেসিং</Badge>
+    }
+  }
+
+  const rowStatusBadge = (status: number) => {
+    switch (status) {
+      case 0:
+        return <Badge variant="success" className="text-[10px]">সঠিক</Badge>
+      case 1:
+        return <Badge variant="warning" className="text-[10px]">সতর্কতা</Badge>
+      case 2:
+        return <Badge variant="destructive" className="text-[10px]">ত্রুটি</Badge>
+      case 3:
+        return <Badge variant="warning" className="text-[10px] bg-amber-500 text-white">ডুপ্লিকেট</Badge>
+      case 4:
+        return <Badge variant="secondary" className="text-[10px] line-through opacity-70">বাদ দেওয়া হয়েছে</Badge>
+      case 5:
+        return <Badge variant="info" className="text-[10px]">সংরক্ষিত</Badge>
+      default:
+        return <Badge variant="secondary" className="text-[10px]">অজ্ঞাত</Badge>
     }
   }
 
@@ -1000,15 +1236,37 @@ export function ImportsPage() {
 
                       {/* Action Buttons */}
                       <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="gap-1.5 text-xs"
-                          onClick={handleStageQuestion}
-                        >
-                          <Plus className="size-3.5" />
-                          তালিকায় যোগ করুন (+)
-                        </Button>
+                        {editingStagedId ? (
+                          <div className="flex items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="default"
+                              className="gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+                              onClick={handleStageQuestion}
+                            >
+                              <Check className="size-3.5" />
+                              হালনাগাদ সম্পন্ন করুন (✓)
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              className="text-xs text-muted-foreground hover:text-foreground"
+                              onClick={handleCancelEditStaged}
+                            >
+                              সম্পাদনা বাতিল
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="gap-1.5 text-xs"
+                            onClick={handleStageQuestion}
+                          >
+                            <Plus className="size-3.5" />
+                            তালিকায় যোগ করুন (+)
+                          </Button>
+                        )}
 
                         <Button
                           type="button"
@@ -1037,7 +1295,10 @@ export function ImportsPage() {
                             variant="ghost"
                             size="sm"
                             className="h-7 text-xs text-destructive hover:bg-destructive/10"
-                            onClick={() => setStagedQuestions([])}
+                            onClick={() => {
+                              if (editingStagedId) handleCancelEditStaged()
+                              setStagedQuestions([])
+                            }}
                           >
                             সকল মুছুন
                           </Button>
@@ -1048,21 +1309,37 @@ export function ImportsPage() {
                           {stagedQuestions.map((q, qIdx) => (
                             <div
                               key={q.id}
-                              className="p-3 rounded-lg border border-border bg-card text-xs space-y-1.5"
+                              className={`p-3 rounded-lg border text-xs space-y-1.5 transition-all ${
+                                editingStagedId === q.id
+                                  ? 'border-primary bg-primary/5 ring-1 ring-primary/30 shadow-xs'
+                                  : 'border-border bg-card'
+                              }`}
                             >
                               <div className="flex items-start justify-between gap-2">
                                 <span className="font-semibold text-foreground line-clamp-1">
                                   {toBnDigits(qIdx + 1)}. {q.title}
                                 </span>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setStagedQuestions((prev) => prev.filter((item) => item.id !== q.id))
-                                  }
-                                  className="text-muted-foreground hover:text-destructive p-1"
-                                >
-                                  <Trash2 className="size-3.5" />
-                                </button>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleEditStaged(q)}
+                                    className="text-muted-foreground hover:text-primary p-1 rounded hover:bg-muted/80 transition-colors"
+                                    title="সম্পাদনা করুন"
+                                  >
+                                    <Pencil className="size-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (editingStagedId === q.id) handleCancelEditStaged()
+                                      setStagedQuestions((prev) => prev.filter((item) => item.id !== q.id))
+                                    }}
+                                    className="text-muted-foreground hover:text-destructive p-1 rounded hover:bg-destructive/10 transition-colors"
+                                    title="মুছে ফেলুন"
+                                  >
+                                    <Trash2 className="size-3.5" />
+                                  </button>
+                                </div>
                               </div>
 
                               {q.type === 0 && q.options && (
@@ -1344,122 +1621,517 @@ export function ImportsPage() {
       </Tabs>
 
       {/* Preview & Commit Dialog */}
-      <Dialog open={Boolean(previewJob)} onOpenChange={(open) => !open && setPreviewJob(null)}>
+      <Dialog
+        open={Boolean(previewJob)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPreviewJob(null)
+            setEditingRow(null)
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base">
-              <CheckCircle className="size-4 text-emerald-600" />
-              ইমপোর্ট প্রাকদর্শন ও অনুমোদন
-            </DialogTitle>
-            <DialogDescription className="text-xs">
-              বিশ্লেষণকৃত প্রশ্নগুলো পর্যালোচনা করুন এবং ব্যাংকে যুক্ত করতে অনুমোদন দিন
-            </DialogDescription>
-          </DialogHeader>
+          {editingRow ? (
+            /* Mode B: Edit Selected Row */
+            <>
+              <DialogHeader>
+                <div className="flex items-center justify-between">
+                  <DialogTitle className="flex items-center gap-2 text-base">
+                    <Pencil className="size-4 text-primary" />
+                    সারি {toBnDigits(editingRow.rowNo)}: প্রশ্ন সম্পাদনা ও সংশোধন
+                  </DialogTitle>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs text-muted-foreground hover:text-foreground gap-1"
+                    onClick={() => setEditingRow(null)}
+                  >
+                    <ArrowLeft className="size-3.5" />
+                    প্রাকদর্শনে ফিরুন
+                  </Button>
+                </div>
+                <DialogDescription className="text-xs">
+                  প্রশ্নের মূলভাব, অপশন ও সঠিক উত্তর সংশোধন করুন। সংরক্ষণের সাথে সাথে স্বয়ংক্রিয়ভাবে পুনঃযাচাই হবে।
+                </DialogDescription>
+              </DialogHeader>
 
-          {previewJob && (
-            <div className="flex flex-wrap items-center gap-2 py-2 border-y border-border text-xs">
-              <span className="text-muted-foreground">মোট সারি: <strong>{toBnDigits(previewJob.totals.total)}</strong></span>
-              <span className="text-emerald-600">ত্রুটিমুক্ত: <strong>{toBnDigits(previewJob.totals.ok)}</strong></span>
-              {previewJob.totals.warning > 0 && (
-                <span className="text-amber-600">সতর্কতা: <strong>{toBnDigits(previewJob.totals.warning)}</strong></span>
-              )}
-              {previewJob.totals.error > 0 && (
-                <span className="text-rose-600">ত্রুটি: <strong>{toBnDigits(previewJob.totals.error)}</strong></span>
-              )}
-            </div>
-          )}
-
-          <div className="flex-1 overflow-y-auto py-3 space-y-2.5">
-            {isLoadingRows ? (
-              <div className="space-y-2 py-4">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-16 rounded bg-muted/60 animate-pulse" />
-                ))}
-              </div>
-            ) : previewRows.length > 0 ? (
-              previewRows.map((row) => (
-                <div
-                  key={row.id}
-                  className="rounded-lg border border-border p-3 text-xs space-y-1.5 bg-card"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-foreground">
-                      সারি {toBnDigits(row.rowNo)}
-                    </span>
-                    <Badge
-                      variant={
-                        row.status === 0
-                          ? 'success'
-                          : row.status === 1
-                          ? 'warning'
-                          : 'destructive'
-                      }
-                      className="text-[10px]"
-                    >
-                      {row.status === 0 ? 'সঠিক' : row.status === 1 ? 'সতর্কতা' : 'ত্রুটি'}
-                    </Badge>
+              <div className="flex-1 overflow-y-auto py-3 space-y-4">
+                {/* Warning / Error notice */}
+                {editingRow.messages && editingRow.messages.length > 0 && (
+                  <div className="p-3 rounded-lg border border-rose-200 bg-rose-50/70 dark:bg-rose-950/30 text-rose-800 dark:text-rose-200 text-xs space-y-1.5">
+                    <div className="font-semibold flex items-center gap-1.5">
+                      <AlertCircle className="size-4 text-rose-600 shrink-0" />
+                      চিহ্নিত সমস্যা / ত্রুটি:
+                    </div>
+                    <ul className="list-disc list-inside space-y-0.5 text-[11px] pl-1">
+                      {editingRow.messages.map((m, mIdx) => (
+                        <li key={mIdx}>{m.messageBn}</li>
+                      ))}
+                    </ul>
                   </div>
-                  <p className="font-medium text-foreground line-clamp-2">
-                    {row.draft?.stem}
-                  </p>
-                  {row.draft?.options && row.draft.options.length > 0 && (
-                    <div className="grid grid-cols-2 gap-1 text-[11px] text-muted-foreground pt-1">
-                      {row.draft.options.slice(0, 4).map((opt, oIdx) => (
-                        <span key={oIdx} className="truncate">
-                          {['ক', 'খ', 'গ', 'ঘ'][oIdx]}. {opt}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  {row.draft?.correctRaw && (
-                    <p className="text-[11px] text-emerald-600 font-medium">
-                      উত্তর: {row.draft.correctRaw}
-                    </p>
-                  )}
-                  {row.messages && row.messages.length > 0 && (
-                    <div className="space-y-0.5 pt-1 text-[11px] text-rose-500">
-                      {row.messages.map((m, mIdx) => (
-                        <div key={mIdx} className="flex items-center gap-1">
-                          <AlertCircle className="size-3 shrink-0" />
-                          <span>{m.messageBn}</span>
+                )}
+
+                {/* Stem / Title */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="editStem" className="text-xs font-semibold text-foreground">
+                    প্রশ্নের শিরোনাম / উদ্দীপক (Title / Stem) *
+                  </Label>
+                  <textarea
+                    id="editStem"
+                    rows={3}
+                    value={editStem}
+                    onChange={(e) => setEditStem(e.target.value)}
+                    placeholder="প্রশ্নের মূলভাব বা উদ্দীপক লিখুন..."
+                    className="w-full rounded-md border border-input bg-background p-3 text-xs leading-relaxed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring font-sans"
+                  />
+                </div>
+
+                {/* MCQ Options */}
+                {editingRow.draft?.type === 0 ? (
+                  <div className="space-y-3 pt-1">
+                    <Label className="text-xs font-semibold text-foreground block">
+                      অপশনসমূহ (Separate Options) *
+                    </Label>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {/* Option ক */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="editOptA" className="text-[11px] text-muted-foreground font-medium">
+                            অপশন (ক)
+                          </Label>
+                          {editCorrectRaw === 'ক' && (
+                            <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-0.5">
+                              <Check className="size-3" /> সঠিক উত্তর
+                            </span>
+                          )}
                         </div>
-                      ))}
+                        <div className="flex rounded-md shadow-2xs">
+                          <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted/60 text-xs font-bold text-foreground">
+                            ক
+                          </span>
+                          <Input
+                            id="editOptA"
+                            value={editOptionA}
+                            onChange={(e) => setEditOptionA(e.target.value)}
+                            placeholder="অপশন ক..."
+                            className="rounded-l-none text-xs"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Option খ */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="editOptB" className="text-[11px] text-muted-foreground font-medium">
+                            অপশন (খ)
+                          </Label>
+                          {editCorrectRaw === 'খ' && (
+                            <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-0.5">
+                              <Check className="size-3" /> সঠিক উত্তর
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex rounded-md shadow-2xs">
+                          <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted/60 text-xs font-bold text-foreground">
+                            খ
+                          </span>
+                          <Input
+                            id="editOptB"
+                            value={editOptionB}
+                            onChange={(e) => setEditOptionB(e.target.value)}
+                            placeholder="অপশন খ..."
+                            className="rounded-l-none text-xs"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Option গ */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="editOptC" className="text-[11px] text-muted-foreground font-medium">
+                            অপশন (গ)
+                          </Label>
+                          {editCorrectRaw === 'গ' && (
+                            <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-0.5">
+                              <Check className="size-3" /> সঠিক উত্তর
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex rounded-md shadow-2xs">
+                          <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted/60 text-xs font-bold text-foreground">
+                            গ
+                          </span>
+                          <Input
+                            id="editOptC"
+                            value={editOptionC}
+                            onChange={(e) => setEditOptionC(e.target.value)}
+                            placeholder="অপশন গ..."
+                            className="rounded-l-none text-xs"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Option ঘ */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="editOptD" className="text-[11px] text-muted-foreground font-medium">
+                            অপশন (ঘ)
+                          </Label>
+                          {editCorrectRaw === 'ঘ' && (
+                            <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-0.5">
+                              <Check className="size-3" /> সঠিক উত্তর
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex rounded-md shadow-2xs">
+                          <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted/60 text-xs font-bold text-foreground">
+                            ঘ
+                          </span>
+                          <Input
+                            id="editOptD"
+                            value={editOptionD}
+                            onChange={(e) => setEditOptionD(e.target.value)}
+                            placeholder="অপশন ঘ..."
+                            className="rounded-l-none text-xs"
+                          />
+                        </div>
+                      </div>
                     </div>
+
+                    {/* Correct Answer Selection */}
+                    <div className="pt-2 space-y-1.5">
+                      <Label className="text-xs font-medium text-foreground">
+                        সঠিক উত্তর নির্বাচন করুন *
+                      </Label>
+                      <div className="flex gap-2">
+                        {(['ক', 'খ', 'গ', 'ঘ'] as const).map((opt) => (
+                          <button
+                            key={opt}
+                            type="button"
+                            onClick={() => setEditCorrectRaw(opt)}
+                            className={`flex-1 py-2 rounded-md border text-xs font-bold transition-all ${
+                              editCorrectRaw === opt
+                                ? 'border-emerald-600 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 ring-2 ring-emerald-500/20'
+                                : 'border-input bg-background hover:bg-muted/60 text-muted-foreground'
+                            }`}
+                          >
+                            {opt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* CQ Parts */
+                  <div className="space-y-3 pt-1">
+                    <Label className="text-xs font-semibold text-foreground block">
+                      সৃজনশীল প্রশ্ন অংশসমূহ (CQ Parts) *
+                    </Label>
+
+                    <div className="space-y-2.5">
+                      <div className="space-y-1">
+                        <Label className="text-[11px] text-muted-foreground">
+                          ক. জ্ঞানমূলক (১ নম্বর) *
+                        </Label>
+                        <Input
+                          placeholder="ক অংশের প্রশ্ন..."
+                          value={editCqPartA}
+                          onChange={(e) => setEditCqPartA(e.target.value)}
+                          className="text-xs"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label className="text-[11px] text-muted-foreground">
+                          খ. অনুধাবনমূলক (২ নম্বর) *
+                        </Label>
+                        <Input
+                          placeholder="খ অংশের প্রশ্ন..."
+                          value={editCqPartB}
+                          onChange={(e) => setEditCqPartB(e.target.value)}
+                          className="text-xs"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label className="text-[11px] text-muted-foreground">
+                          গ. প্রয়োগমূলক (৩ নম্বর) *
+                        </Label>
+                        <Input
+                          placeholder="গ অংশের প্রশ্ন..."
+                          value={editCqPartC}
+                          onChange={(e) => setEditCqPartC(e.target.value)}
+                          className="text-xs"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label className="text-[11px] text-muted-foreground">
+                          ঘ. উচ্চতর দক্ষতামূলক (৪ নম্বর) *
+                        </Label>
+                        <Input
+                          placeholder="ঘ অংশের প্রশ্ন..."
+                          value={editCqPartD}
+                          onChange={(e) => setEditCqPartD(e.target.value)}
+                          className="text-xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Explanation */}
+                <div className="space-y-1.5 pt-1">
+                  <Label htmlFor="editExpl" className="text-xs font-medium text-muted-foreground">
+                    উত্তরের ব্যাখ্যা (ঐচ্ছিক)
+                  </Label>
+                  <Input
+                    id="editExpl"
+                    value={editExplanation}
+                    onChange={(e) => setEditExplanation(e.target.value)}
+                    placeholder="উত্তরের ব্যাখ্যা লিখুন..."
+                    className="text-xs"
+                  />
+                </div>
+
+                {/* Exclude Toggle */}
+                <div className="flex items-start gap-3 p-3 rounded-lg border border-border bg-muted/30">
+                  <input
+                    type="checkbox"
+                    id="editExcludeToggle"
+                    checked={editExcluded}
+                    onChange={(e) => setEditExcluded(e.target.checked)}
+                    className="mt-0.5 size-4 rounded border-gray-300 text-primary accent-primary focus:ring-primary cursor-pointer"
+                  />
+                  <div className="space-y-0.5">
+                    <Label htmlFor="editExcludeToggle" className="text-xs font-semibold text-foreground cursor-pointer">
+                      এই প্রশ্নটি ইমপোর্ট থেকে বাদ দিন (Exclude)
+                    </Label>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      যদি কোনো প্রশ্ন ইমপোর্ট করতে না চান বা এর সমস্যা পরে দেখতে চান, তবে এটি বাদ দিয়ে বাকি প্রশ্নগুলো কমিট করতে পারেন।
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter className="pt-2 border-t border-border flex items-center justify-between sm:justify-between">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditingRow(null)}
+                  disabled={isSavingRow}
+                >
+                  বাতিল
+                </Button>
+                <Button
+                  type="button"
+                  loading={isSavingRow}
+                  loadingText="সংরক্ষণ হচ্ছে..."
+                  onClick={handleSaveEditRow}
+                  className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
+                >
+                  <CheckCircle className="size-4" />
+                  সংরক্ষণ ও পুনঃযাচাই
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            /* Mode A: Preview List of Rows */
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-base">
+                  <CheckCircle className="size-4 text-emerald-600" />
+                  ইমপোর্ট প্রাকদর্শন ও অনুমোদন
+                </DialogTitle>
+                <DialogDescription className="text-xs">
+                  বিশ্লেষণকৃত প্রশ্নগুলো পর্যালোচনা করুন, প্রয়োজনমতো সম্পাদনা করুন এবং ব্যাংকে যুক্ত করতে অনুমোদন দিন
+                </DialogDescription>
+              </DialogHeader>
+
+              {previewJob && (
+                <div className="flex flex-wrap items-center gap-2 py-2 border-y border-border text-xs">
+                  <span className="text-muted-foreground">
+                    মোট সারি: <strong>{toBnDigits(previewJob.totals.total)}</strong>
+                  </span>
+                  <span className="text-emerald-600">
+                    ত্রুটিমুক্ত: <strong>{toBnDigits(previewJob.totals.ok)}</strong>
+                  </span>
+                  {previewJob.totals.warning > 0 && (
+                    <span className="text-amber-600">
+                      সতর্কতা: <strong>{toBnDigits(previewJob.totals.warning)}</strong>
+                    </span>
+                  )}
+                  {previewJob.totals.error > 0 && (
+                    <span className="text-rose-600">
+                      ত্রুটি: <strong>{toBnDigits(previewJob.totals.error)}</strong>
+                    </span>
+                  )}
+                  {previewJob.totals.excluded > 0 && (
+                    <span className="text-muted-foreground line-through">
+                      বাদ দেওয়া হয়েছে: <strong>{toBnDigits(previewJob.totals.excluded)}</strong>
+                    </span>
                   )}
                 </div>
-              ))
-            ) : (
-              <p className="text-center text-xs text-muted-foreground py-6">
-                কোনো রো খুঁজে পাওয়া যায়নি।
-              </p>
-            )}
-          </div>
+              )}
 
-          <DialogFooter className="pt-2 border-t border-border">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setPreviewJob(null)}
-              disabled={isCommitting}
-            >
-              বন্ধ করুন
-            </Button>
-            <Button
-              type="button"
-              disabled={
-                isCommitting ||
-                (previewJob?.totals?.error ?? 0) > 0 ||
-                (previewJob?.totals?.ok ?? 0) === 0
-              }
-              loading={isCommitting}
-              loadingText="কমিট হচ্ছে..."
-              onClick={handleCommitJob}
-              className="gap-1.5"
-            >
-              <CheckCircle className="size-4" />
-              কমিট করুন ({toBnDigits(previewJob?.totals?.ok ?? 0)} টি প্রশ্ন ব্যাংকে যুক্ত হবে)
-            </Button>
-          </DialogFooter>
+              <div className="flex-1 overflow-y-auto py-3 space-y-2.5">
+                {isLoadingRows ? (
+                  <div className="space-y-2 py-4">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="h-16 rounded bg-muted/60 animate-pulse" />
+                    ))}
+                  </div>
+                ) : previewRows.length > 0 ? (
+                  previewRows.map((row) => (
+                    <div
+                      key={row.id}
+                      className={`rounded-lg border p-3 text-xs space-y-2 transition-all ${
+                        row.status === 4
+                          ? 'border-dashed border-border/80 bg-muted/20 opacity-70'
+                          : 'border-border bg-card'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-foreground">
+                            সারি {toBnDigits(row.rowNo)}
+                          </span>
+                          {rowStatusBadge(row.status)}
+                          <Badge variant="outline" className="text-[10px] font-normal">
+                            {row.draft?.type === 0 ? 'MCQ' : 'CQ'}
+                          </Badge>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs gap-1 px-2.5 hover:border-primary hover:text-primary"
+                            onClick={() => handleOpenEditRow(row)}
+                          >
+                            <Pencil className="size-3" />
+                            সম্পাদনা
+                          </Button>
+
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={togglingRowId === row.id}
+                            className={`h-7 text-xs px-2 ${
+                              row.status === 4
+                                ? 'text-primary hover:bg-primary/10'
+                                : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'
+                            }`}
+                            onClick={() => handleToggleExclude(row)}
+                          >
+                            {row.status === 4 ? 'অন্তর্ভুক্ত করুন' : 'বাদ দিন'}
+                          </Button>
+                        </div>
+                      </div>
+
+                      <p className="font-medium text-foreground line-clamp-2">
+                        {row.draft?.stem || row.draft?.stimulus}
+                      </p>
+
+                      {/* Options preview for MCQ */}
+                      {row.draft?.type === 0 && row.draft.options && row.draft.options.length > 0 && (
+                        <div className="grid grid-cols-2 gap-1 text-[11px] text-muted-foreground pt-0.5">
+                          {row.draft.options.slice(0, 4).map((opt, oIdx) => {
+                            const letter = ['ক', 'খ', 'গ', 'ঘ'][oIdx]
+                            const isCorrect =
+                              row.draft?.correctRaw === letter || row.draft?.correctIndex === oIdx
+                            return (
+                              <span
+                                key={oIdx}
+                                className={`truncate ${
+                                  isCorrect ? 'text-emerald-600 font-semibold' : ''
+                                }`}
+                              >
+                                {letter}. {opt}
+                              </span>
+                            )
+                          })}
+                        </div>
+                      )}
+
+                      {/* CQ Parts preview */}
+                      {row.draft?.type === 1 && row.draft.cqParts && row.draft.cqParts.length > 0 && (
+                        <div className="space-y-1 text-[11px] text-muted-foreground pt-0.5">
+                          {row.draft.cqParts.map((p, pIdx) => (
+                            <div key={pIdx} className="flex items-start gap-1">
+                              <span className="font-semibold text-foreground">
+                                {['ক', 'খ', 'গ', 'ঘ'][pIdx]}.
+                              </span>
+                              <span className="truncate flex-1">{p.prompt}</span>
+                              {p.marks && (
+                                <span className="text-[10px] text-muted-foreground shrink-0">
+                                  [{toBnDigits(p.marks)}]
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {row.draft?.correctRaw && (
+                        <p className="text-[11px] text-emerald-600 font-medium">
+                          উত্তর: {row.draft.correctRaw}
+                        </p>
+                      )}
+
+                      {row.draft?.explanation && (
+                        <p className="text-[10px] text-muted-foreground/80 italic">
+                          ব্যাখ্যা: {row.draft.explanation}
+                        </p>
+                      )}
+
+                      {row.messages && row.messages.length > 0 && (
+                        <div className="space-y-0.5 pt-1 text-[11px] text-rose-500">
+                          {row.messages.map((m, mIdx) => (
+                            <div key={mIdx} className="flex items-center gap-1">
+                              <AlertCircle className="size-3 shrink-0" />
+                              <span>{m.messageBn}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-center text-xs text-muted-foreground py-6">
+                    কোনো রো খুঁজে পাওয়া যায়নি।
+                  </p>
+                )}
+              </div>
+
+              <DialogFooter className="pt-2 border-t border-border">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setPreviewJob(null)}
+                  disabled={isCommitting}
+                >
+                  বন্ধ করুন
+                </Button>
+                <Button
+                  type="button"
+                  disabled={
+                    isCommitting ||
+                    (previewJob?.totals?.error ?? 0) > 0 ||
+                    (previewJob?.totals?.ok ?? 0) === 0
+                  }
+                  loading={isCommitting}
+                  loadingText="কমিট হচ্ছে..."
+                  onClick={handleCommitJob}
+                  className="gap-1.5"
+                >
+                  <CheckCircle className="size-4" />
+                  কমিট করুন ({toBnDigits(previewJob?.totals?.ok ?? 0)} টি প্রশ্ন ব্যাংকে যুক্ত হবে)
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
