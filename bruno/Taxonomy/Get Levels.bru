@@ -1,0 +1,15 @@
+meta {
+  name: Get Levels
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/taxonomy/levels
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

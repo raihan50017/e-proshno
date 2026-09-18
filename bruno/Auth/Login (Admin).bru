@@ -1,0 +1,24 @@
+meta {
+  name: Login (Admin)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/auth/login
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "loginId": "admin@example.com",
+    "password": "Admin12345"
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.session && res.body.session.accessToken) {
+    bru.setEnvVar("token", res.body.session.accessToken);
+  }
+}

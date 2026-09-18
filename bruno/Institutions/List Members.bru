@@ -1,0 +1,15 @@
+meta {
+  name: List Members
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/institution/members
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

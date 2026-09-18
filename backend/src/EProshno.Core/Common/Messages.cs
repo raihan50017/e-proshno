@@ -153,6 +153,11 @@ public static class Messages
 
     // Students
     public const string RollTaken = "এই ব্যাচে এই রোল নম্বর আগেই আছে।";
+    public const string RollRequired = "রোল নম্বর দিন।";
+    public const string RollDuplicateInFile = "ফাইলে এই রোল নম্বর একাধিকবার আছে।";
+    public const string BatchNotEmpty = "ব্যাচে শিক্ষার্থী আছে। আগে শিক্ষার্থীদের সরিয়ে নিন বা মুছে ফেলুন।";
+    public const string BatchNameTaken = "এই নামে আগেই একটি ব্যাচ আছে।";
+    public const string StudentFileMissingColumns = "প্রয়োজনীয় কলাম পাওয়া যায়নি: {0}";
     public const string BatchNameRequired = "ব্যাচের নাম দিন।";
     public const string NameRequired = "নাম লিখুন।";
 }

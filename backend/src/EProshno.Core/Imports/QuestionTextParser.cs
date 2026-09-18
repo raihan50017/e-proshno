@@ -21,7 +21,7 @@ public sealed class QuestionTextParser
     // Meta keys compared against the folded input, so fold them the same way.
     private static readonly string KeyExplanation = BanglaText.FoldForParsing("ব্যাখ্যা");
     private static readonly string KeyBoard = BanglaText.FoldForParsing("বোর্ড");
-    private static readonly string KeyDifficulty = BanglaText.FoldForParsing("কঠিনতা");
+    private static readonly string KeyDifficulty = BanglaText.FoldForParsing("কঠিনতা"); 
     private static readonly string KeyImportance = BanglaText.FoldForParsing("গুরুত্ব");
     private static readonly string KeyTopic = BanglaText.FoldForParsing("টপিক");
 

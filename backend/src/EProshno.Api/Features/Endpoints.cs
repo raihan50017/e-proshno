@@ -21,6 +21,7 @@ public static class Endpoints
     public static IServiceCollection AddFeatureServices(this IServiceCollection services, IConfiguration config)
     {
         services.Configure<SupportOptions>(config.GetSection(SupportOptions.Section));
+        services.Configure<Dashboard.DashboardOptions>(config.GetSection(Dashboard.DashboardOptions.Section));
         services.AddScoped<MeReader>();
         services.AddScoped<OtpSender>();
         services.AddScoped<Questions.QuestionSearch>();
@@ -28,7 +29,12 @@ public static class Endpoints
         services.AddScoped<QuestionBanks.BankAccess>();
         services.AddScoped<QuestionBanks.BankQuestionRemover>();
         services.AddScoped<Imports.ImportAccess>();
+        services.AddScoped<Imports.ImportReader>();
         services.AddScoped<QuestionSets.SetAccess>();
+        services.AddScoped<QuestionSets.SetReader>();
+        services.AddScoped<QuestionSets.SetScopeChecker>();
+        services.AddScoped<QuestionSets.PdfJobs>();
+        services.AddScoped<Billing.BillingReader>();
         return services;
     }
 

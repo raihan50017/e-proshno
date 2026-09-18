@@ -30,6 +30,11 @@ public sealed class BillingOptions
 
     public PaymentGateway Gateway { get; set; } = PaymentGateway.Fake;
 
+    /// <summary>Seller shown on invoices (the public brand is still undecided).</summary>
+    public string SellerName { get; set; } = "e-proshno";
+
+    public string? SellerAddress { get; set; }
+
     /// <summary>Development-only gateway that lets you approve a payment in the browser.</summary>
     public bool EnableFakeGateway { get; set; }
 }
@@ -62,6 +67,9 @@ public interface IEntitlements
     Task EnsureSubjectAccessAsync(Guid institutionId, Guid subjectId, CancellationToken ct);
 
     Task AssertWithinLimitAsync(Guid institutionId, LimitKey key, CancellationToken ct, int adding = 1);
+
+    /// <summary>How much of a limit is used right now (not cached).</summary>
+    Task<int> CountUsageAsync(Guid institutionId, LimitKey key, CancellationToken ct);
 
     Task InvalidateAsync(Guid institutionId, CancellationToken ct);
 }
@@ -137,7 +145,7 @@ public sealed class Entitlements(
             return;
         }
 
-        var used = await CountAsync(institutionId, key, ct);
+        var used = await CountUsageAsync(institutionId, key, ct);
         if (used + adding > limit)
         {
             throw new AppException($"limit.{key.ToString().ToLowerInvariant()}", LimitMessage(key), 402);
@@ -177,7 +185,7 @@ public sealed class Entitlements(
             HasActivePlan: paid.Count > 0);
     }
 
-    private async Task<int> CountAsync(Guid institutionId, LimitKey key, CancellationToken ct)
+    public async Task<int> CountUsageAsync(Guid institutionId, LimitKey key, CancellationToken ct)
     {
         switch (key)
         {

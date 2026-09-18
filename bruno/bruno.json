@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "name": "e-proshno API",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}

@@ -2,11 +2,11 @@
   "profiles": {
     "EProshno.Worker": {
       "commandName": "Project",
-      "launchBrowser": true,
+      "launchBrowser": false,
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
-      "applicationUrl": "https://localhost:64952;http://localhost:64953"
+      "applicationUrl": "http://localhost:5081"
     }
   }
 }

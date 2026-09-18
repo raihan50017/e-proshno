@@ -45,4 +45,8 @@ public static class Guard
 {
     public static T Found<T>(T? value)
         where T : class => value ?? throw AppException.NotFound();
+
+    /// <summary>A 400 with one field error, for rules that need the database.</summary>
+    public static FluentValidation.ValidationException Invalid(string field, string message) =>
+        new([new FluentValidation.Results.ValidationFailure(field, message)]);
 }

@@ -34,7 +34,7 @@ public static class DependencyInjection
 
     public static string PostgresConnectionString(this IConfiguration config) =>
         config.GetConnectionString("Postgres")
-        ?? throw new InvalidOperationException("ConnectionStrings:Postgres is not configured.");
+        ?? throw new InvalidOperationException("ConnectionStrings:Postgr es is not configured.");
 
     /// <summary>Hangfire storage shared by the API (client) and the Worker (server).</summary>
     public static IGlobalConfiguration UseAppStorage(this IGlobalConfiguration hangfire, string connectionString) =>
