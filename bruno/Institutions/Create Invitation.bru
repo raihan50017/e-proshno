@@ -1,0 +1,25 @@
+meta {
+  name: Create Invitation
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/institution/invitations
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "name": "সহকারী শিক্ষক",
+    "phone": "+8801711122233",
+    "email": "assistant@example.com",
+    "role": "Teacher"
+  }
+}
+

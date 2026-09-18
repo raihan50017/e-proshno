@@ -1,0 +1,16 @@
+meta {
+  name: List Imports
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/imports
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+

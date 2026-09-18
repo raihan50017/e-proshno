@@ -1,0 +1,25 @@
+meta {
+  name: Checkout Plan
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/billing/checkout
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "planId": "01a0b2d1-8e71-72e7-bc5b-3c42d4f64513",
+    "subjectIds": [
+      "01a0b2d1-8dc1-745b-9b5f-470ddf0f7ddd"
+    ]
+  }
+}
+

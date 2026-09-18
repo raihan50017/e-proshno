@@ -1,0 +1,31 @@
+meta {
+  name: Create Student
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/students
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "batchId": "{{batchId}}",
+    "roll": "{{studentRoll}}",
+    "name": "রাকিবুল ইসলাম",
+    "phone": "+8801812345678",
+    "guardianPhone": "+8801712345678",
+    "email": "rakib@example.com"
+  }
+}
+
+script:pre-request {
+  bru.setVar("studentRoll", "" + Math.floor(Math.random() * 900 + 100));
+}
+

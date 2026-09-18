@@ -1,0 +1,16 @@
+meta {
+  name: Admin Overview
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/admin/overview
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminToken}}
+}
+

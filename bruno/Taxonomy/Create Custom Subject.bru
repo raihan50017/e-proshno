@@ -1,0 +1,24 @@
+meta {
+  name: Create Custom Subject
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/taxonomy/custom/subjects
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "levelId": "01a0b2d1-8db8-7110-a4df-cce906968e47",
+    "nameBn": "বিশ্ববিদ্যালয় ভর্তি পদার্থ",
+    "paper": null
+  }
+}
+

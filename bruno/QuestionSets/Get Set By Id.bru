@@ -1,0 +1,16 @@
+meta {
+  name: Get Question Set By Id
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/question-sets/{{setId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+

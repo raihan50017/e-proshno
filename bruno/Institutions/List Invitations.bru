@@ -1,0 +1,16 @@
+meta {
+  name: List Invitations
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/institution/invitations
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+

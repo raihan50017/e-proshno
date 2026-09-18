@@ -1,0 +1,16 @@
+meta {
+  name: List Admin Institutions
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/admin/institutions
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminToken}}
+}
+

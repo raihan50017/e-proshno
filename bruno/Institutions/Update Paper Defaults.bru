@@ -1,0 +1,33 @@
+meta {
+  name: Update Paper Defaults
+  type: http
+  seq: 6
+}
+
+put {
+  url: {{baseUrl}}/institution/paper-defaults
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "settings": {
+      "columns": 2,
+      "fontSizePt": 11.0,
+      "paperSize": "A4",
+      "fontFamily": "NotoSerifBengali",
+      "marginsMm": {
+        "top": 12,
+        "bottom": 12,
+        "left": 12,
+        "right": 12
+      }
+    }
+  }
+}
+

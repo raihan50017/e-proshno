@@ -1,0 +1,16 @@
+meta {
+  name: Download Import Template
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/imports/templates/Mcq?subjectId=01a0b2d1-8dc1-745b-9b5f-470ddf0f7ddd
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+

@@ -1,0 +1,27 @@
+meta {
+  name: Create Announcement
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/admin/announcements
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminToken}}
+}
+
+body:json {
+  {
+    "titleBn": "নতুন প্রশ্ন সংযোজন",
+    "bodyBn": "পদার্থবিজ্ঞান প্রথম পত্রের ৩য় অধ্যায়ের নতুন প্রশ্ন যোগ করা হয়েছে।",
+    "linkUrl": "/question-bank",
+    "startsAt": "2026-09-18T00:00:00Z",
+    "endsAt": "2026-10-18T00:00:00Z",
+    "isActive": true
+  }
+}
+

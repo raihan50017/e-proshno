@@ -1,0 +1,23 @@
+meta {
+  name: Auto Select Questions
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/question-sets/{{setId}}/auto-select
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "targetCount": 25,
+    "keepExisting": false
+  }
+}
+

@@ -1,0 +1,16 @@
+meta {
+  name: Review Questions Queue
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/admin/questions?status=Draft
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminToken}}
+}
+

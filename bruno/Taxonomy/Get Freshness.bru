@@ -1,0 +1,16 @@
+meta {
+  name: Get Freshness
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/taxonomy/freshness
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+

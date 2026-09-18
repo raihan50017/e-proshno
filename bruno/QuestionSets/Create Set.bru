@@ -1,0 +1,40 @@
+meta {
+  name: Create Question Set
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/question-sets
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "title": "প্রথম সাময়িক পরীক্ষা ২০২৬",
+    "levelId": "01a0b2d1-8db8-7110-a4df-cce906968e47",
+    "subjectId": "01a0b2d1-8dc1-745b-9b5f-470ddf0f7ddd",
+    "chapterIds": [
+      "01a0b2d1-8dd3-7194-a496-22add74927b2"
+    ],
+    "type": "Mcq",
+    "mode": "Manual",
+    "source": "Platform",
+    "bankIds": [],
+    "targetCount": 25,
+    "durationMin": 25,
+    "fullMarks": 25.0
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setEnvVar("setId", res.body.id);
+  }
+}
+

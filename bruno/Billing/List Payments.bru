@@ -1,0 +1,16 @@
+meta {
+  name: List Payments
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/billing/payments
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+

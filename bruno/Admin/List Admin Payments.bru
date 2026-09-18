@@ -1,0 +1,16 @@
+meta {
+  name: List Admin Payments
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/admin/payments
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminToken}}
+}
+

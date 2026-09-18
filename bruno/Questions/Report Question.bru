@@ -1,0 +1,22 @@
+meta {
+  name: Report Question
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/questions/01a0b2d1-91d0-7146-8708-b5910d634839/report
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "reason": "প্রশ্নের উত্তর সঠিক নয় বলে মনে হচ্ছে।"
+  }
+}
+

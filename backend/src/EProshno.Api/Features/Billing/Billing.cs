@@ -463,9 +463,15 @@ public static class ListPayments
                 payments = payments.Where(p => p.Id.CompareTo(cursor) < 0);
             }
 
-            return await reader.Payments(payments)
+            var paged = await payments
                 .OrderByDescending(p => p.Id)
                 .ToPageAsync(p => Paging.Cursor(p.Id), query.Limit, ct);
+
+            var ids = paged.Items.Select(p => p.Id).ToList();
+            var dtos = await reader.Payments(db.Payments.Where(p => ids.Contains(p.Id))).ToDictionaryAsync(p => p.Id, ct);
+            return new CursorPage<PaymentDto>(
+                paged.Items.Select(p => dtos[p.Id]).ToList(),
+                paged.NextCursor);
         }
     }
 }

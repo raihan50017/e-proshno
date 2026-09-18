@@ -1,0 +1,16 @@
+meta {
+  name: Get Chapters
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/taxonomy/subjects/01a0b2d1-8dc1-745b-9b5f-470ddf0f7ddd/chapters
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+

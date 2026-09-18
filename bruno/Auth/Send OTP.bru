@@ -1,0 +1,19 @@
+meta {
+  name: Send OTP
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/auth/otp/send
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "phone": "+8801700000002",
+    "purpose": "Login"
+  }
+}
+

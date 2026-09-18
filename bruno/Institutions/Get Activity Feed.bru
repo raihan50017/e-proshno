@@ -1,0 +1,16 @@
+meta {
+  name: Get Activity Feed
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/institution/activity
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+

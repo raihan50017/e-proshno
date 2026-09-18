@@ -1,0 +1,33 @@
+meta {
+  name: Create Batch
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/batches
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "name": "{{batchName}}",
+    "levelId": "01a0b2d1-8db8-7110-a4df-cce906968e47",
+    "year": 2026
+  }
+}
+
+script:pre-request {
+  bru.setVar("batchName", "এসএসসি ২০২৬ ব্যাচ " + Math.floor(Date.now() / 1000));
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setEnvVar("batchId", res.body.id);
+  }
+}

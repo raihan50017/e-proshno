@@ -1,0 +1,23 @@
+meta {
+  name: Request Set PDF
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/question-sets/{{setId}}/pdf
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "variants": 1,
+    "includeAnswerKey": true
+  }
+}
+

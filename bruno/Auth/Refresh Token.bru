@@ -20,6 +20,7 @@ body:json {
 
 script:post-response {
   if (res.body && res.body.accessToken) {
-    bru.setEnvVar("token", res.body.accessToken);
+    bru.setEnvVar("refreshedToken", res.body.accessToken);
   }
 }
+

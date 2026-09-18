@@ -1,0 +1,27 @@
+meta {
+  name: Create Question Bank
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/question-banks
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "name": "মডেল টেস্ট ২০২৬",
+    "description": "এইচএসসি ব্যাচ-এ মডেল টেস্টের নিজস্ব প্রশ্ন",
+    "levelId": "01a0b2d1-8db8-7110-a4df-cce906968e47",
+    "subjectId": "01a0b2d1-8dc1-745b-9b5f-470ddf0f7ddd",
+    "sharing": "Institution",
+    "requireApproval": false
+  }
+}
+
