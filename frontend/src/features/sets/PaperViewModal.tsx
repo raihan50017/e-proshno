@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { Combobox } from '@/components/ui/combobox'
 import {
   Dialog,
   DialogContent,
@@ -177,16 +178,19 @@ export function PaperViewModal({ setId, isOpen, onClose }: PaperViewModalProps) 
 
             {/* Font Size Selector */}
             <div className="flex items-center gap-1.5">
-              <span className="text-muted-foreground">ফন্ট:</span>
-              <select
-                className="h-7 rounded border border-input bg-background px-2 text-xs"
-                value={fontSizePt}
-                onChange={(e) => setFontSizePt(Number(e.target.value))}
-              >
-                <option value={10}>ছোট (১০pt)</option>
-                <option value={11}>স্বাভাবিক (১১pt)</option>
-                <option value={12}>বড় (১২pt)</option>
-              </select>
+              <span className="text-muted-foreground text-xs">ফন্ট:</span>
+              <div className="w-28">
+                <Combobox
+                  options={[
+                    { value: '10', label: '১০pt (ছোট)' },
+                    { value: '11', label: '১১pt (স্বাভাবিক)' },
+                    { value: '12', label: '১২pt (বড়)' },
+                  ]}
+                  value={String(fontSizePt)}
+                  onChange={(val) => setFontSizePt(Number(val))}
+                  triggerClassName="h-7 text-xs px-2"
+                />
+              </div>
             </div>
 
             {/* Answers Toggle */}

@@ -144,3 +144,4 @@ export function RichText({ content, className }: RichTextProps) {
 
   return <span className={className}>{String(content)}</span>
 }
+

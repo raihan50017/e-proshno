@@ -146,5 +146,9 @@ export const customInstance = <T>(
     headers,
     data,
     signal: options?.signal ?? undefined,
-  }).then((res: AxiosResponse<T>) => res.data)
+  }).then((res: AxiosResponse<any>) => ({
+    data: res.data,
+    status: res.status,
+    headers: res.headers,
+  })) as Promise<T>
 }

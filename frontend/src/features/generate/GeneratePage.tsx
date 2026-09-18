@@ -13,7 +13,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { PageHeader } from '@/components/shared/page-header'
-import type { ChapterDto } from '@/lib/api/model/chapterDto'
+import { Combobox } from '@/components/ui/combobox'
+import type { LevelDto, SubjectDto, ChapterDto } from '@/lib/api/model'
 import { useListLevels, useListSubjects, useListChapters } from '@/lib/api/generated/taxonomy/taxonomy'
 import { apiClient } from '@/lib/api-client'
 import { toBnDigits } from '@/lib/bn'
@@ -21,14 +22,24 @@ import { toBnDigits } from '@/lib/bn'
 export function GeneratePage() {
   const navigate = useNavigate()
   const { data: levelsData, isLoading: levelsLoading } = useListLevels()
-  const levels = levelsData?.data || []
+  const levels: LevelDto[] = React.useMemo(() => {
+    if (!levelsData) return []
+    if (Array.isArray(levelsData)) return levelsData
+    if ('data' in levelsData && Array.isArray((levelsData as any).data)) return (levelsData as any).data
+    return []
+  }, [levelsData])
 
   const [selectedLevelId, setSelectedLevelId] = React.useState<string>('')
   const { data: subjectsData, isLoading: subjectsLoading } = useListSubjects(
     selectedLevelId ? { levelId: selectedLevelId } : undefined,
     { query: { enabled: Boolean(selectedLevelId) } }
   )
-  const subjects = subjectsData?.data || []
+  const subjects: SubjectDto[] = React.useMemo(() => {
+    if (!subjectsData) return []
+    if (Array.isArray(subjectsData)) return subjectsData
+    if ('data' in subjectsData && Array.isArray((subjectsData as any).data)) return (subjectsData as any).data
+    return []
+  }, [subjectsData])
 
   const [title, setTitle] = React.useState('')
   const [selectedSubjectId, setSelectedSubjectId] = React.useState<string>('')
@@ -44,10 +55,30 @@ export function GeneratePage() {
     selectedSubjectId,
     { query: { enabled: Boolean(selectedSubjectId) } }
   )
-  const chapters: ChapterDto[] =
-    chaptersData && 'data' in chaptersData && Array.isArray(chaptersData.data)
-      ? (chaptersData.data as ChapterDto[])
-      : []
+  const chapters: ChapterDto[] = React.useMemo(() => {
+    if (!chaptersData) return []
+    if (Array.isArray(chaptersData)) return chaptersData
+    if ('data' in chaptersData && Array.isArray((chaptersData as any).data)) return (chaptersData as any).data
+    return []
+  }, [chaptersData])
+
+  const levelOptions = React.useMemo(
+    () =>
+      levels.map((lvl) => ({
+        value: lvl.id,
+        label: lvl.nameBn,
+      })),
+    [levels]
+  )
+
+  const subjectOptions = React.useMemo(
+    () =>
+      subjects.map((sub) => ({
+        value: sub.id,
+        label: `${sub.label || sub.nameBn}${sub.paper ? ` (${toBnDigits(sub.paper)}য় পত্র)` : ''}`,
+      })),
+    [subjects]
+  )
 
   React.useEffect(() => {
     if (levels.length > 0 && !selectedLevelId) {
@@ -210,45 +241,36 @@ export function GeneratePage() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="level">শ্রেণি / স্তর *</Label>
-                    <select
-                      id="level"
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    <Combobox
+                      options={levelOptions}
                       value={selectedLevelId}
-                      onChange={(e) => {
-                        setSelectedLevelId(e.target.value)
+                      onChange={(val) => {
+                        setSelectedLevelId(val)
                         setSelectedSubjectId('')
                       }}
-                      disabled={levelsLoading}
-                      required
-                    >
-                      {levels.map((lvl) => (
-                        <option key={lvl.id} value={lvl.id}>
-                          {lvl.nameBn}
-                        </option>
-                      ))}
-                    </select>
+                      placeholder="শ্রেণি / স্তর নির্বাচন করুন"
+                      searchPlaceholder="শ্রেণি খুঁজুন..."
+                      loading={levelsLoading}
+                    />
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="subject">বিষয় *</Label>
-                    <select
-                      id="subject"
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    <Combobox
+                      options={subjectOptions}
                       value={selectedSubjectId}
-                      onChange={(e) => setSelectedSubjectId(e.target.value)}
-                      disabled={subjectsLoading || subjects.length === 0}
-                      required
-                    >
-                      {subjects.length === 0 ? (
-                        <option value="">কোনো বিষয় পাওয়া যায়নি</option>
-                      ) : (
-                        subjects.map((sub) => (
-                          <option key={sub.id} value={sub.id}>
-                            {sub.label || sub.nameBn} {sub.paper ? `(${toBnDigits(sub.paper)}য় পত্র)` : ''}
-                          </option>
-                        ))
-                      )}
-                    </select>
+                      onChange={(val) => setSelectedSubjectId(val)}
+                      placeholder={
+                        !selectedLevelId
+                          ? 'প্রথমে শ্রেণি নির্বাচন করুন'
+                          : subjects.length === 0
+                          ? 'কোনো বিষয় পাওয়া যায়নি'
+                          : 'বিষয় নির্বাচন করুন'
+                      }
+                      searchPlaceholder="বিষয় খুঁজুন..."
+                      disabled={!selectedLevelId || subjects.length === 0}
+                      loading={subjectsLoading}
+                    />
                   </div>
                 </div>
 

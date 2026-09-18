@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { Combobox } from '@/components/ui/combobox'
 import type { RenderedPaper } from '@/lib/api/model/renderedPaper'
 import { useGetSetPaper } from '@/lib/api/generated/question-sets/question-sets'
 import { apiClient } from '@/lib/api-client'
@@ -127,15 +128,18 @@ export function PaperPrintPage() {
           </div>
 
           {/* Font Size Selector */}
-          <select
-            className="h-8 rounded border border-input bg-background px-2 text-xs"
-            value={fontSizePt}
-            onChange={(e) => setFontSizePt(Number(e.target.value))}
-          >
-            <option value={10}>১০pt</option>
-            <option value={11}>১১pt</option>
-            <option value={12}>১২pt</option>
-          </select>
+          <div className="w-24">
+            <Combobox
+              options={[
+                { value: '10', label: '১০pt' },
+                { value: '11', label: '১১pt' },
+                { value: '12', label: '১২pt' },
+              ]}
+              value={String(fontSizePt)}
+              onChange={(val) => setFontSizePt(Number(val))}
+              triggerClassName="h-8 text-xs px-2"
+            />
+          </div>
 
           {/* Answers Toggle */}
           <Button
