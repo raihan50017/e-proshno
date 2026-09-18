@@ -13,7 +13,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { PageHeader } from '@/components/shared/page-header'
-import { useListLevels, useListSubjects } from '@/lib/api/generated/taxonomy/taxonomy'
+import type { ChapterDto } from '@/lib/api/model/chapterDto'
+import { useListLevels, useListSubjects, useListChapters } from '@/lib/api/generated/taxonomy/taxonomy'
 import { apiClient } from '@/lib/api-client'
 import { toBnDigits } from '@/lib/bn'
 
@@ -32,11 +33,21 @@ export function GeneratePage() {
   const [title, setTitle] = React.useState('')
   const [selectedSubjectId, setSelectedSubjectId] = React.useState<string>('')
   const [questionType, setQuestionType] = React.useState<'Mcq' | 'Cq'>('Mcq')
-  const [questionCount, setQuestionCount] = React.useState(25)
-  const [durationMin, setDurationMin] = React.useState(30)
-  const [fullMarks, setFullMarks] = React.useState(25)
+  const [questionCount, setQuestionCount] = React.useState(10)
+  const [durationMin, setDurationMin] = React.useState(20)
+  const [fullMarks, setFullMarks] = React.useState(10)
   const [source, setSource] = React.useState<'Platform' | 'MyBanks' | 'Both'>('Both')
+  const [selectedChapterIds, setSelectedChapterIds] = React.useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = React.useState(false)
+
+  const { data: chaptersData, isLoading: chaptersLoading } = useListChapters(
+    selectedSubjectId,
+    { query: { enabled: Boolean(selectedSubjectId) } }
+  )
+  const chapters: ChapterDto[] =
+    chaptersData && 'data' in chaptersData && Array.isArray(chaptersData.data)
+      ? (chaptersData.data as ChapterDto[])
+      : []
 
   React.useEffect(() => {
     if (levels.length > 0 && !selectedLevelId) {
@@ -50,37 +61,108 @@ export function GeneratePage() {
     }
   }, [subjects, selectedSubjectId])
 
+  React.useEffect(() => {
+    if (chapters.length > 0) {
+      setSelectedChapterIds(chapters.map((c) => c.id))
+    } else {
+      setSelectedChapterIds([])
+    }
+  }, [chapters])
+
+  const toggleChapter = (chapterId: string) => {
+    setSelectedChapterIds((prev) =>
+      prev.includes(chapterId)
+        ? prev.filter((id) => id !== chapterId)
+        : [...prev, chapterId]
+    )
+  }
+
+  const toggleAllChapters = () => {
+    if (selectedChapterIds.length === chapters.length) {
+      setSelectedChapterIds([])
+    } else {
+      setSelectedChapterIds(chapters.map((c) => c.id))
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!title.trim()) {
       toast.error('প্রশ্নপত্রের শিরোনাম লিখুন')
       return
     }
+    if (!selectedLevelId) {
+      toast.error('অনুগ্রহ করে শ্রেণি বা স্তর নির্বাচন করুন')
+      return
+    }
     if (!selectedSubjectId) {
       toast.error('অনুগ্রহ করে বিষয় নির্বাচন করুন')
+      return
+    }
+    if (selectedChapterIds.length === 0) {
+      toast.error('কমপক্ষে একটি অধ্যায় নির্বাচন করুন')
       return
     }
 
     setIsSubmitting(true)
     try {
+      const typeNum = questionType === 'Mcq' ? 0 : 1
+      const sourceNum = source === 'Platform' ? 0 : source === 'MyBanks' ? 1 : 2
+      const modeNum = 1 // Auto-selection mode
+
+      // Step 1: Create question set scope
       const res = await apiClient.post('/api/v1/question-sets', {
         title: title.trim(),
+        levelId: selectedLevelId,
         subjectId: selectedSubjectId,
-        type: questionType,
+        chapterIds: selectedChapterIds,
+        type: typeNum,
+        mode: modeNum,
+        source: sourceNum,
+        bankIds: [],
         targetCount: questionCount,
         durationMin,
         fullMarks,
-        source,
       })
 
       const newId = res.data?.id
-      toast.success('প্রশ্নসেট সফলভাবে তৈরি হয়েছে!')
-      navigate(`/sets?id=${newId || ''}`)
+      if (newId) {
+        // Step 2: Auto-select questions from database
+        try {
+          const autoRes = await apiClient.post(`/api/v1/question-sets/${newId}/auto-select`, {
+            keepExisting: false,
+            targetCount: questionCount,
+          })
+          const questionIds: string[] = autoRes.data?.questionIds || []
+
+          if (questionIds.length > 0) {
+            // Step 3: Save selected questions into set
+            await apiClient.put(`/api/v1/question-sets/${newId}/items`, {
+              items: questionIds.map((qid) => ({
+                questionId: qid,
+                marks: typeNum === 0 ? 1 : 10,
+              })),
+            })
+          }
+        } catch (autoErr) {
+          console.warn('Auto-select completed with note:', autoErr)
+        }
+
+        toast.success('প্রশ্নপত্র সফলভাবে তৈরি হয়েছে!')
+        navigate(`/sets?id=${newId}`)
+      }
     } catch (err: any) {
-      const errorMsg =
-        err?.response?.data?.detail ||
-        err?.response?.data?.message ||
-        'প্রশ্নসেট তৈরিতে সমস্যা হয়েছে'
+      const data = err?.response?.data
+      let errorMsg = ''
+      if (data?.errors && typeof data.errors === 'object') {
+        const firstError = Object.values(data.errors)[0]
+        if (Array.isArray(firstError) && firstError.length > 0) {
+          errorMsg = firstError[0]
+        }
+      }
+      if (!errorMsg) {
+        errorMsg = data?.title || data?.detail || data?.message || 'প্রশ্নসেট তৈরিতে সমস্যা হয়েছে'
+      }
       toast.error(errorMsg)
     } finally {
       setIsSubmitting(false)
@@ -169,6 +251,64 @@ export function GeneratePage() {
                     </select>
                   </div>
                 </div>
+
+                {/* Chapters Selection Card */}
+                {selectedSubjectId && (
+                  <div className="space-y-2 pt-2 border-t border-border/80">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-semibold">
+                        অন্তর্ভুক্ত অধ্যায়সমূহ * ({toBnDigits(selectedChapterIds.length)}/{toBnDigits(chapters.length)})
+                      </Label>
+                      {chapters.length > 0 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs text-primary"
+                          onClick={toggleAllChapters}
+                        >
+                          {selectedChapterIds.length === chapters.length ? 'সবগুলো বাদ দিন' : 'সবগুলো নির্বাচন'}
+                        </Button>
+                      )}
+                    </div>
+
+                    {chaptersLoading ? (
+                      <div className="text-xs text-muted-foreground p-3 bg-muted/40 rounded-md animate-pulse">
+                        অধ্যায় লোড হচ্ছে...
+                      </div>
+                    ) : chapters.length === 0 ? (
+                      <div className="text-xs text-muted-foreground p-3 bg-muted/20 rounded-md">
+                        এই বিষয়ে কোনো অধ্যায় পাওয়া যায়নি।
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto p-1 border rounded-md bg-muted/10">
+                        {chapters.map((chapter) => {
+                          const isChecked = selectedChapterIds.includes(chapter.id)
+                          return (
+                            <label
+                              key={chapter.id}
+                              className={`flex items-center gap-2 p-2 rounded text-xs cursor-pointer transition-colors border ${
+                                isChecked
+                                  ? 'bg-primary/5 border-primary/40 text-foreground font-medium'
+                                  : 'bg-card border-border/60 text-muted-foreground hover:bg-muted/40'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                className="rounded text-primary size-4 accent-primary"
+                                checked={isChecked}
+                                onChange={() => toggleChapter(chapter.id)}
+                              />
+                              <span className="truncate">
+                                অধ্যায় {toBnDigits(chapter.number)}: {chapter.nameBn}
+                              </span>
+                            </label>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Question Type Selection */}
                 <div className="space-y-2 pt-2">

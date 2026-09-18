@@ -13,6 +13,7 @@ import { StudentsPage } from '@/features/students/StudentsPage'
 import { InstitutionPage } from '@/features/institution/InstitutionPage'
 import { BillingPage } from '@/features/billing/BillingPage'
 import { SupportPage } from '@/features/support/SupportPage'
+import { PaperPrintPage } from '@/features/sets/PaperPrintPage'
 
 export const router = createBrowserRouter([
   // Public auth routes
@@ -51,6 +52,14 @@ export const router = createBrowserRouter([
           {
             path: '/sets',
             element: <QuestionSetsPage />,
+          },
+          {
+            path: '/sets/:id',
+            element: <PaperPrintPage />,
+          },
+          {
+            path: '/print/sets/:id',
+            element: <PaperPrintPage />,
           },
           {
             path: '/my-banks',

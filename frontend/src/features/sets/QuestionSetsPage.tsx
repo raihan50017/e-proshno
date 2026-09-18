@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   FilePlus2,
   Printer,
@@ -25,11 +25,25 @@ import { SearchInput } from '@/components/shared/search-input'
 import { useListQuestionSets } from '@/lib/api/generated/question-sets/question-sets'
 import { apiClient } from '@/lib/api-client'
 import { formatDateBn, toBnDigits } from '@/lib/bn'
+import { PaperViewModal } from './PaperViewModal'
 
 export function QuestionSetsPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [searchQuery, setSearchQuery] = React.useState('')
   const [deleteTargetId, setDeleteTargetId] = React.useState<string | null>(null)
+  const [selectedSetIdForView, setSelectedSetIdForView] = React.useState<string | null>(null)
   const [isDeleting, setIsDeleting] = React.useState(false)
+
+  // Auto-open modal if ?id= is passed from Generate flow
+  React.useEffect(() => {
+    const idParam = searchParams.get('id')
+    if (idParam) {
+      setSelectedSetIdForView(idParam)
+      // clear the query param after picking it up
+      searchParams.delete('id')
+      setSearchParams(searchParams, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
 
   const { data, isLoading, refetch } = useListQuestionSets({})
   const sets = data?.data?.items || []
@@ -140,9 +154,7 @@ export function QuestionSetsPage() {
                             variant="outline"
                             size="sm"
                             className="h-8 text-xs gap-1"
-                            onClick={() => {
-                              window.open(`/api/v1/question-sets/${set.id}/paper`, '_blank')
-                            }}
+                            onClick={() => setSelectedSetIdForView(set.id)}
                           >
                             <Printer className="size-3.5" />
                             প্রিন্ট / ভিউ
@@ -194,6 +206,13 @@ export function QuestionSetsPage() {
         confirmVariant="destructive"
         loading={isDeleting}
         onConfirm={handleDelete}
+      />
+
+      {/* Paper Live Preview & Print Modal */}
+      <PaperViewModal
+        setId={selectedSetIdForView}
+        isOpen={Boolean(selectedSetIdForView)}
+        onClose={() => setSelectedSetIdForView(null)}
       />
     </div>
   )

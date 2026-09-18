@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import type { QuestionCard } from '@/lib/api/model/questionCard'
 import { OPTION_LABELS, toBnDigits } from '@/lib/bn'
 import { cn } from '@/lib/utils'
+import { RichText } from './rich-text'
 
 export interface QuestionItemCardProps {
   question: QuestionCard
@@ -94,13 +95,13 @@ export function QuestionItemCard({
         {question.stimulus && (
           <div className="rounded-md border border-border/80 bg-muted/30 p-3 text-sm leading-relaxed text-foreground/90">
             <span className="font-semibold text-primary block mb-1">উদ্দীপক:</span>
-            {question.stimulus}
+            <RichText content={question.stimulus} />
           </div>
         )}
 
         {/* Question Stem */}
         <div className="text-sm font-medium text-foreground leading-relaxed">
-          {question.stem}
+          <RichText content={question.stem} />
         </div>
 
         {/* Options for MCQ */}
@@ -128,7 +129,9 @@ export function QuestionItemCard({
                   >
                     {label}
                   </span>
-                  <span className="flex-1">{opt.content}</span>
+                  <div className="flex-1">
+                    <RichText content={opt.content} />
+                  </div>
                   {opt.isCorrect && (
                     <CheckCircle2 className="size-3.5 text-emerald-600 shrink-0" />
                   )}
@@ -148,7 +151,9 @@ export function QuestionItemCard({
               >
                 <div className="flex gap-2">
                   <span className="font-bold text-primary">({OPTION_LABELS[pIdx] || pIdx + 1})</span>
-                  <span>{part.prompt}</span>
+                  <div>
+                    <RichText content={part.prompt} />
+                  </div>
                 </div>
                 <span className="shrink-0 text-muted-foreground font-medium">
                   [{toBnDigits(part.marks)}]
