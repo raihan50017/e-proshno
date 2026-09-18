@@ -1,4 +1,4 @@
-import { CheckCircle2, Copy, Flag, Star } from 'lucide-react'
+import { CheckCircle2, Copy, Edit3, Flag, PlusCircle, Star } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -14,6 +14,8 @@ export interface QuestionItemCardProps {
   onToggleSelect?: (question: QuestionCard) => void
   onCopy?: (question: QuestionCard) => void
   onReport?: (question: QuestionCard) => void
+  onEdit?: (question: QuestionCard) => void
+  onAddToSet?: (question: QuestionCard) => void
   showActions?: boolean
   className?: string
 }
@@ -25,6 +27,8 @@ export function QuestionItemCard({
   onToggleSelect,
   onCopy,
   onReport,
+  onEdit,
+  onAddToSet,
   showActions = true,
   className,
 }: QuestionItemCardProps) {
@@ -168,12 +172,36 @@ export function QuestionItemCard({
           <div className="flex items-center justify-between pt-2 border-t border-border/60 text-xs text-muted-foreground">
             <div>
               {question.bankName && (
-                <span className="text-[11px] text-muted-foreground">
+                <span className="text-[11px] text-muted-foreground font-medium">
                   ব্যাংক: {question.bankName}
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {onAddToSet && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs px-2.5 gap-1.5 border-primary/40 text-primary hover:bg-primary/10 font-semibold"
+                  onClick={() => onAddToSet(question)}
+                >
+                  <PlusCircle className="size-3.5" />
+                  সেটে যোগ
+                </Button>
+              )}
+              {onEdit && (question.canEdit || question.bankId) && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs px-2 gap-1 text-primary hover:bg-primary/10"
+                  onClick={() => onEdit(question)}
+                >
+                  <Edit3 className="size-3" />
+                  সম্পাদনা
+                </Button>
+              )}
               {onCopy && (
                 <Button
                   type="button"

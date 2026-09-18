@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { BookOpen, Copy, Flag } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -17,10 +18,12 @@ import { EmptyState } from '@/components/shared/empty-state'
 import { PageHeader } from '@/components/shared/page-header'
 import { QuestionItemCard } from '@/components/shared/question-item-card'
 import { SearchInput } from '@/components/shared/search-input'
+import { AddToSetModal } from '@/features/sets/AddToSetModal'
+import { QuestionEditModal } from './QuestionEditModal'
 import { useListBanks } from '@/lib/api/generated/question-banks/question-banks'
 import { useListSubjects, useListChapters } from '@/lib/api/generated/taxonomy/taxonomy'
 import { useSearchQuestions, useCopyQuestions, useReportQuestion } from '@/lib/api/generated/questions/questions'
-import type { QuestionCard, ChapterDto, SubjectDto, BankDto } from '@/lib/api/model'
+import type { QuestionCard, ChapterDto, SubjectDto, BankDto, QuestionSource } from '@/lib/api/model'
 import { toBnDigits } from '@/lib/bn'
 
 export function QuestionBankPage() {
@@ -44,10 +47,21 @@ export function QuestionBankPage() {
     return []
   }, [chaptersData])
 
+  const [searchParams] = useSearchParams()
+  const initialBankId = searchParams.get('bankId') || ''
+
+  const [selectedSource, setSelectedSource] = React.useState<QuestionSource>((initialBankId ? 1 : 0) as QuestionSource)
+  const [selectedBankId, setSelectedBankId] = React.useState<string>(initialBankId)
   const [selectedChapterId, setSelectedChapterId] = React.useState<string>('all')
   const [selectedType, setSelectedType] = React.useState<'All' | 'Mcq' | 'Cq'>('All')
   const [keyword, setKeyword] = React.useState('')
   const [questions, setQuestions] = React.useState<QuestionCard[]>([])
+
+  // Edit Question Modal State
+  const [editQuestion, setEditQuestion] = React.useState<QuestionCard | null>(null)
+
+  // Add To Set Modal State
+  const [addToSetQuestion, setAddToSetQuestion] = React.useState<QuestionCard | null>(null)
 
   // Custom Banks for Copy action
   const { data: banksData, isLoading: banksLoading } = useListBanks()
@@ -114,17 +128,16 @@ export function QuestionBankPage() {
     }
   }, [banks, targetBankId])
 
-  // Trigger search on parameter changes
-  React.useEffect(() => {
-    if (!selectedSubjectId) return
+  const executeSearch = React.useCallback(() => {
+    if (!selectedSubjectId && selectedSource === 0) return
 
     search({
       data: {
-        subjectId: selectedSubjectId,
+        subjectId: selectedSubjectId || '',
         chapterIds: selectedChapterId && selectedChapterId !== 'all' ? [selectedChapterId] : [],
         type: selectedType === 'All' ? null : selectedType === 'Mcq' ? 0 : 1,
-        source: 0, // 0 = Platform
-        bankIds: [],
+        source: selectedSource,
+        bankIds: selectedSource === 1 && selectedBankId ? [selectedBankId] : [],
         filters: {
           keyword: keyword.trim() || null,
           mode: 0,
@@ -136,7 +149,11 @@ export function QuestionBankPage() {
         limit: 50,
       },
     })
-  }, [selectedSubjectId, selectedChapterId, selectedType, keyword, search])
+  }, [selectedSubjectId, selectedChapterId, selectedType, selectedSource, selectedBankId, keyword, search])
+
+  React.useEffect(() => {
+    executeSearch()
+  }, [executeSearch])
 
   const subjectOptions = React.useMemo(
     () =>
@@ -211,7 +228,59 @@ export function QuestionBankPage() {
 
       {/* Filter Toolbar Card */}
       <Card className="border-border">
-        <CardContent className="p-4 space-y-4">
+        <CardContent className="p-4 space-y-3">
+          {/* Source Tabs: Platform vs Custom/Imported Banks */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-border/60">
+            <div className="flex items-center rounded-md border border-input p-0.5 bg-muted/40">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedSource(0)
+                  setSelectedBankId('')
+                }}
+                className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
+                  selectedSource === 0
+                    ? 'bg-background text-foreground shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                প্ল্যাটফর্ম প্রশ্নভাণ্ডার
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedSource(1)
+                  if (banks.length > 0 && !selectedBankId) {
+                    setSelectedBankId(banks[0].id)
+                  }
+                }}
+                className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
+                  selectedSource === 1
+                    ? 'bg-background text-foreground shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                আমার নিজস্ব / ইমপোর্ট ব্যাংক ({toBnDigits(banks.length)})
+              </button>
+            </div>
+
+            {selectedSource === 1 && banks.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">টার্গেট ব্যাংক:</span>
+                <div className="w-56">
+                  <Combobox
+                    options={bankOptions}
+                    value={selectedBankId}
+                    onChange={(val) => setSelectedBankId(val)}
+                    placeholder="ব্যাংক নির্বাচন করুন"
+                    searchPlaceholder="ব্যাংক খুঁজুন..."
+                    triggerClassName="h-8 text-xs"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {/* Subject Selector */}
             <div className="space-y-1">
@@ -302,6 +371,8 @@ export function QuestionBankPage() {
               key={q.id}
               question={q}
               index={idx}
+              onAddToSet={(item) => setAddToSetQuestion(item)}
+              onEdit={(item) => setEditQuestion(item)}
               onCopy={(item) => setCopyQuestion(item)}
               onReport={(item) => setReportQuestion(item)}
             />
@@ -433,6 +504,22 @@ export function QuestionBankPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Question Edit Modal (for custom / imported questions) */}
+      <QuestionEditModal
+        question={editQuestion}
+        bankId={selectedBankId || editQuestion?.bankId || undefined}
+        isOpen={Boolean(editQuestion)}
+        onClose={() => setEditQuestion(null)}
+        onSuccess={() => executeSearch()}
+      />
+
+      {/* Add To Question Set Modal */}
+      <AddToSetModal
+        question={addToSetQuestion}
+        isOpen={Boolean(addToSetQuestion)}
+        onClose={() => setAddToSetQuestion(null)}
+      />
     </div>
   )
 }

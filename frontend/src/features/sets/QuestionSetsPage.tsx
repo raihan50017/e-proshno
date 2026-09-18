@@ -6,6 +6,7 @@ import {
   Files,
   Layers2,
   ListChecks,
+  Pencil,
   Printer,
   Sparkles,
   Trash2,
@@ -31,6 +32,7 @@ import { useListQuestionSets } from '@/lib/api/generated/question-sets/question-
 import { apiClient } from '@/lib/api-client'
 import { formatDateBn, toBnDigits } from '@/lib/bn'
 import { PaperViewModal } from './PaperViewModal'
+import { QuestionSetEditModal } from './QuestionSetEditModal'
 
 export function QuestionSetsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -38,6 +40,7 @@ export function QuestionSetsPage() {
   const [typeFilter, setTypeFilter] = React.useState<'all' | 'MCQ' | 'CQ'>('all')
   const [deleteTargetId, setDeleteTargetId] = React.useState<string | null>(null)
   const [selectedSetIdForView, setSelectedSetIdForView] = React.useState<string | null>(null)
+  const [selectedSetIdForEdit, setSelectedSetIdForEdit] = React.useState<string | null>(null)
   const [isDeleting, setIsDeleting] = React.useState(false)
   const [duplicatingId, setDuplicatingId] = React.useState<string | null>(null)
 
@@ -281,6 +284,15 @@ export function QuestionSetsPage() {
                             variant="ghost"
                             size="icon"
                             className="size-8 text-muted-foreground hover:text-primary"
+                            onClick={() => setSelectedSetIdForEdit(set.id)}
+                            title="প্রশ্নসেট সম্পাদনা করুন"
+                          >
+                            <Pencil className="size-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 text-muted-foreground hover:text-primary"
                             onClick={() => handleDuplicate(set.id, set.title)}
                             disabled={duplicatingId === set.id}
                             title="অনুলিপি করুন"
@@ -345,6 +357,14 @@ export function QuestionSetsPage() {
         setId={selectedSetIdForView}
         isOpen={Boolean(selectedSetIdForView)}
         onClose={() => setSelectedSetIdForView(null)}
+      />
+
+      {/* Question Set Edit Modal */}
+      <QuestionSetEditModal
+        setId={selectedSetIdForEdit}
+        isOpen={Boolean(selectedSetIdForEdit)}
+        onClose={() => setSelectedSetIdForEdit(null)}
+        onSuccess={() => refetch()}
       />
     </div>
   )
