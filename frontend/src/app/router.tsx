@@ -15,6 +15,7 @@ import { InstitutionPage } from '@/features/institution/InstitutionPage'
 import { BillingPage } from '@/features/billing/BillingPage'
 import { SupportPage } from '@/features/support/SupportPage'
 import { PaperPrintPage } from '@/features/sets/PaperPrintPage'
+import { AdminPage } from '@/features/admin/AdminPage'
 
 export const router = createBrowserRouter([
   // Public auth routes
@@ -97,6 +98,10 @@ export const router = createBrowserRouter([
           {
             path: '/support',
             element: <SupportPage />,
+          },
+          {
+            path: '/admin',
+            element: <AdminPage />,
           },
         ],
       },

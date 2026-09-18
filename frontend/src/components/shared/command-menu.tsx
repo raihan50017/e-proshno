@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   LogOut,
   Search,
+  ShieldAlert,
   Sparkles,
   UploadCloud,
   Video,
@@ -45,6 +46,7 @@ const navItems: CommandNavItem[] = [
   { label: 'সাবস্ক্রিপশন ও বিলিং', href: '/billing', icon: CreditCard, keywords: ['billing', 'subscription'] },
   { label: 'টিউটোরিয়াল', href: '/tutorials', icon: Video, keywords: ['tutorial', 'help', 'video'] },
   { label: 'যোগাযোগ ও সাপোর্ট', href: '/support', icon: HelpCircle, keywords: ['support', 'contact'] },
+  { label: 'ব্যাক-অফিস অ্যাডমিন প্যানেল', href: '/admin', icon: ShieldAlert, keywords: ['admin', 'superadmin', 'backoffice', 'staff'] },
 ]
 
 interface CommandMenuProps {
