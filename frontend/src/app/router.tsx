@@ -3,6 +3,7 @@ import { AppShell } from './layouts/AppShell'
 import { AuthGuard } from '@/features/auth/AuthGuard'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { RegisterPage } from '@/features/auth/RegisterPage'
+import { InviteAcceptPage } from '@/features/institution/InviteAcceptPage'
 import { DashboardPage } from '@/features/dashboard/DashboardPage'
 import { GeneratePage } from '@/features/generate/GeneratePage'
 import { QuestionBankPage } from '@/features/question-bank/QuestionBankPage'
@@ -24,6 +25,10 @@ export const router = createBrowserRouter([
   {
     path: '/register',
     element: <RegisterPage />,
+  },
+  {
+    path: '/invite/:token',
+    element: <InviteAcceptPage />,
   },
 
   // Protected application routes
