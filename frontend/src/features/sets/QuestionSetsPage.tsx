@@ -6,6 +6,7 @@ import {
   Files,
   Layers2,
   ListChecks,
+  MonitorPlay,
   Pencil,
   Printer,
   Sparkles,
@@ -271,6 +272,17 @@ export function QuestionSetsPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
+                          <Link to={`/smartboard?setId=${set.id}`}>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 text-xs gap-1 border-border text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10"
+                              title="স্মার্টবোর্ড মোডে ক্লাসরুমে উপস্থাপন করুন"
+                            >
+                              <MonitorPlay className="size-3.5" />
+                              <span className="hidden sm:inline">স্মার্টবোর্ড</span>
+                            </Button>
+                          </Link>
                           <Button
                             variant="outline"
                             size="sm"

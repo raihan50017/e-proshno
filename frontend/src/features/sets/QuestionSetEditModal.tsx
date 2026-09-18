@@ -29,6 +29,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { apiClient } from '@/lib/api-client'
 import { toBnDigits } from '@/lib/bn'
+import { QuestionEditModal } from '@/features/question-bank/QuestionEditModal'
+import type { QuestionCard } from '@/lib/api/model/questionCard'
 
 interface QuestionSetEditModalProps {
   setId: string | null
@@ -72,6 +74,27 @@ export function QuestionSetEditModal({
   const [searchResults, setSearchResults] = React.useState<any[]>([])
   const [isSearching, setIsSearching] = React.useState(false)
   const [addingId, setAddingId] = React.useState<string | null>(null)
+
+  // Direct In-Place Question Editing
+  const [editingQuestion, setEditingQuestion] = React.useState<QuestionCard | null>(null)
+  const [isLoadingQuestionDetail, setIsLoadingQuestionDetail] = React.useState<string | null>(null)
+
+  const handleOpenEditQuestion = async (questionId: string) => {
+    setIsLoadingQuestionDetail(questionId)
+    try {
+      const res = await apiClient.get(`/api/v1/questions/${questionId}`)
+      const card = res.data?.card || res.data
+      if (card) {
+        setEditingQuestion(card)
+      } else {
+        toast.error('প্রশ্নের বিস্তারিত পাওয়া যায়নি')
+      }
+    } catch {
+      toast.error('প্রশ্নের তথ্য লোড করতে সমস্যা হয়েছে')
+    } finally {
+      setIsLoadingQuestionDetail(null)
+    }
+  }
 
   // Load Set Details & Paper when opened
   const loadSetData = React.useCallback(async () => {
@@ -275,7 +298,8 @@ export function QuestionSetEditModal({
   const currentTotalMarks = items.reduce((sum, item) => sum + (Number(item.marks) || 0), 0)
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <>
+      <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden">
         <DialogHeader className="p-4 sm:p-5 border-b border-border bg-muted/20">
           <div className="flex items-center gap-2 text-primary">
@@ -476,8 +500,23 @@ export function QuestionSetEditModal({
                           />
                         </div>
 
-                        {/* Reorder actions */}
+                        {/* Reorder & Edit actions */}
                         <div className="flex items-center gap-1 shrink-0">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="size-7 text-muted-foreground hover:text-primary"
+                            onClick={() => handleOpenEditQuestion(item.questionId)}
+                            disabled={isLoadingQuestionDetail === item.questionId}
+                            title="প্রশ্নের বক্তব্য ও অপশন সম্পাদনা করুন"
+                          >
+                            {isLoadingQuestionDetail === item.questionId ? (
+                              <div className="size-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                            ) : (
+                              <Edit3 className="size-3.5" />
+                            )}
+                          </Button>
                           <Button
                             type="button"
                             variant="ghost"
@@ -616,6 +655,19 @@ export function QuestionSetEditModal({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* In-place Question Editor */}
+    <QuestionEditModal
+      question={editingQuestion}
+      isOpen={Boolean(editingQuestion)}
+      onClose={() => setEditingQuestion(null)}
+      onSuccess={() => {
+        setEditingQuestion(null)
+        loadSetData()
+        onSuccess()
+      }}
+    />
+  </>
   )
 }
 

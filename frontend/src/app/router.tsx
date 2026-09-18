@@ -16,6 +16,7 @@ import { BillingPage } from '@/features/billing/BillingPage'
 import { SupportPage } from '@/features/support/SupportPage'
 import { PaperPrintPage } from '@/features/sets/PaperPrintPage'
 import { AdminPage } from '@/features/admin/AdminPage'
+import { SmartboardPage } from '@/features/smartboard/SmartboardPage'
 
 export const router = createBrowserRouter([
   // Public auth routes
@@ -50,6 +51,14 @@ export const router = createBrowserRouter([
           {
             path: '/generate',
             element: <GeneratePage />,
+          },
+          {
+            path: '/smartboard',
+            element: <SmartboardPage />,
+          },
+          {
+            path: '/smartboard/:setId',
+            element: <SmartboardPage />,
           },
           {
             path: '/question-bank',

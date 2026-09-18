@@ -12,6 +12,7 @@ import {
   HelpCircle,
   LayoutDashboard,
   LogOut,
+  MonitorPlay,
   School,
   ShieldAlert,
   Sparkles,
@@ -71,6 +72,7 @@ const navGroups: NavGroup[] = [
     items: [
       { title: 'ড্যাশবোর্ড', href: '/dashboard', icon: LayoutDashboard },
       { title: '১ ক্লিকে প্রশ্ন তৈরি', href: '/generate', icon: Sparkles, badge: 'নতুন' },
+      { title: 'স্মার্টবোর্ড', href: '/smartboard', icon: MonitorPlay, badge: 'প্রজেক্টর' },
       { title: 'প্রশ্নব্যাংক ব্রাউজ', href: '/question-bank', icon: BookOpen },
     ],
   },

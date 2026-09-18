@@ -10,6 +10,7 @@ import {
   HelpCircle,
   LayoutDashboard,
   LogOut,
+  MonitorPlay,
   Search,
   ShieldAlert,
   Sparkles,
@@ -37,6 +38,7 @@ interface CommandNavItem {
 const navItems: CommandNavItem[] = [
   { label: 'ড্যাশবোর্ড', href: '/dashboard', icon: LayoutDashboard, keywords: ['dashboard', 'home'] },
   { label: '১ ক্লিকে প্রশ্ন তৈরি', href: '/generate', icon: Sparkles, keywords: ['generate', 'quick', 'create'] },
+  { label: 'স্মার্টবোর্ড ও প্রজেক্টর মোড', href: '/smartboard', icon: MonitorPlay, keywords: ['smartboard', 'projector', 'classroom', 'presenter'] },
   { label: 'প্রশ্নব্যাংক ব্রাউজ', href: '/question-bank', icon: BookOpen, keywords: ['bank', 'browse', 'question'] },
   { label: 'আমার প্রশ্নসেট', href: '/sets', icon: Files, keywords: ['sets', 'paper'] },
   { label: 'আমার প্রশ্নব্যাংক', href: '/my-banks', icon: Database, keywords: ['my bank', 'custom'] },

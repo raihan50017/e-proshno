@@ -7,6 +7,7 @@ import {
   Eye,
   EyeOff,
   Loader2,
+  MonitorPlay,
   Printer,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -152,6 +153,22 @@ export function PaperPrintPage() {
             {showAnswers ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
             {showAnswers ? 'উত্তরমালা লুকান' : 'উত্তরমালা'}
           </Button>
+
+          {/* Smartboard Presenter */}
+          {id && (
+            <Link to={`/smartboard?setId=${id}`}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs gap-1.5 border-emerald-500/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10"
+                title="ক্লাসরুমে প্রজেক্টর বা ডিজিটাল বোর্ডে উপস্থাপন করুন"
+              >
+                <MonitorPlay className="size-3.5" />
+                স্মার্টবোর্ড
+              </Button>
+            </Link>
+          )}
 
           {/* Download PDF */}
           <Button
