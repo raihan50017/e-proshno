@@ -13,24 +13,96 @@ import {
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { Card, CardContent } from '@/components/ui/card'
+import { AppDataTable, type AppDataTableColumn } from '@/components/shared/app-data-table'
 import { EmptyState } from '@/components/shared/empty-state'
 import { PageHeader } from '@/components/shared/page-header'
 import { StatCard } from '@/components/shared/stat-card'
 import { useGetDashboard } from '@/lib/api/generated/dashboard/dashboard'
 import { formatDateBn, toBnDigits } from '@/lib/bn'
 
+type RecentSet = {
+  id: string
+  title: string
+  levelName: string
+  subjectLabel: string
+  type: number
+  itemCount: number
+  targetCount: number
+  durationMin: number
+  fullMarks: number
+  createdAt: string
+}
+
 export function DashboardPage() {
   const { data, isLoading } = useGetDashboard()
   const dashboard = data?.data
+
+  const recentSetsColumns: AppDataTableColumn<RecentSet>[] = [
+    {
+      key: 'title',
+      header: 'শিরোনাম',
+      cellClassName: 'font-medium text-foreground max-w-xs',
+      render: (set) => <div className="truncate">{set.title}</div>,
+    },
+    {
+      key: 'subject',
+      header: 'শ্রেণি ও বিষয়',
+      cellClassName: 'text-xs text-muted-foreground',
+      render: (set) => `${set.levelName} · ${set.subjectLabel}`,
+    },
+    {
+      key: 'type',
+      header: 'ধরন',
+      render: (set) => (
+        <Badge
+          variant="outline"
+          className={`text-[11px] ${
+            set.type === 0
+              ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+              : 'border-indigo-500/30 bg-indigo-500/10 text-indigo-700 dark:text-indigo-400'
+          }`}
+        >
+          {set.type === 0 ? 'MCQ' : 'CQ'}
+        </Badge>
+      ),
+    },
+    {
+      key: 'count',
+      header: 'প্রশ্ন',
+      render: (set) => (
+        <Badge variant="secondary" className="font-normal text-xs">
+          {toBnDigits(set.itemCount)}/{toBnDigits(set.targetCount)} টি
+        </Badge>
+      ),
+    },
+    {
+      key: 'duration',
+      header: 'সময় ও পূর্ণমান',
+      cellClassName: 'text-xs text-muted-foreground',
+      render: (set) => `${toBnDigits(set.durationMin)} মি. · ${toBnDigits(set.fullMarks)} নম্বর`,
+    },
+    {
+      key: 'date',
+      header: 'তারিখ',
+      cellClassName: 'text-xs text-muted-foreground',
+      render: (set) => formatDateBn(set.createdAt),
+    },
+    {
+      key: 'action',
+      header: '',
+      headerClassName: 'w-24 text-right',
+      cellClassName: 'text-right',
+      render: (set) => (
+        <Link to={`/sets?id=${set.id}`}>
+          <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
+            <Printer className="size-3.5" />
+            প্রিন্ট
+          </Button>
+        </Link>
+      ),
+    },
+  ]
 
   return (
     <div className="space-y-6">
@@ -158,81 +230,51 @@ export function DashboardPage() {
         </Link>
       </div>
 
-      {/* Recent Question Sets Section */}
-      <Card className="border-border">
-        <CardHeader className="flex flex-row items-center justify-between pb-3">
+      {/* Recent Question Sets — AppDataTable */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-lg font-semibold">সম্প্রতি তৈরি প্রশ্নসেট</CardTitle>
-            <CardDescription className="text-xs leading-relaxed">
+            <h2 className="text-base font-semibold text-foreground">সম্প্রতি তৈরি প্রশ্নসেট</h2>
+            <p className="text-xs text-muted-foreground">
               আপনার প্রতিষ্ঠানে সাম্প্রতিক তৈরি ও মুদ্রিত প্রশ্নপত্রসমূহ
-            </CardDescription>
+            </p>
           </div>
           <Link to="/sets">
-            <Button variant="ghost" size="sm" className="text-xs">
+            <Button variant="ghost" size="sm" className="text-xs text-primary hover:text-primary">
               সব দেখুন →
             </Button>
           </Link>
-        </CardHeader>
-        <CardContent>
-          {dashboard?.recentSets && dashboard.recentSets.length > 0 ? (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>শিরোনাম</TableHead>
-                    <TableHead>শ্রেণি ও বিষয়</TableHead>
-                    <TableHead>প্রশ্ন সংখ্যা</TableHead>
-                    <TableHead>সময় ও পূর্ণমান</TableHead>
-                    <TableHead>তারিখ</TableHead>
-                    <TableHead className="text-right">অ্যাকশন</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {dashboard.recentSets.map((set) => (
-                    <TableRow key={set.id}>
-                      <TableCell className="font-medium text-foreground">
-                        {set.title}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-xs">
-                        {set.levelName} · {set.subjectLabel}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="font-normal text-xs">
-                          {toBnDigits(set.itemCount)}/{toBnDigits(set.targetCount)} টি
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {toBnDigits(set.durationMin)} মি. · {toBnDigits(set.fullMarks)} নম্বর
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {formatDateBn(set.createdAt)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Link to={`/sets?id=${set.id}`}>
-                          <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
-                            <Printer className="size-3.5" />
-                            প্রিন্ট
-                          </Button>
-                        </Link>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <EmptyState
-              icon={FilePlus2}
-              title="এখনও কোনো প্রশ্নসেট তৈরি করা হয়নি"
-              description="১ ক্লিকে আপনার সিলেবাস ও অধ্যায় নির্বাচন করে চমৎকার প্রশ্নপত্র তৈরি করুন"
-              actionLabel="নতুন প্রশ্ন তৈরি করুন"
-              onAction={() => {
-                window.location.href = '/generate'
-              }}
-            />
-          )}
-        </CardContent>
-      </Card>
+        </div>
+
+        {dashboard?.recentSets && dashboard.recentSets.length > 0 ? (
+          <AppDataTable<RecentSet>
+            data={dashboard.recentSets as RecentSet[]}
+            columns={recentSetsColumns}
+            isLoading={isLoading}
+            getRowKey={(s) => s.id}
+          />
+        ) : !isLoading ? (
+          <Card className="border-border">
+            <CardContent className="p-8">
+              <EmptyState
+                icon={FilePlus2}
+                title="এখনও কোনো প্রশ্নসেট তৈরি করা হয়নি"
+                description="১ ক্লিকে আপনার সিলেবাস ও অধ্যায় নির্বাচন করে চমৎকার প্রশ্নপত্র তৈরি করুন"
+                actionLabel="নতুন প্রশ্ন তৈরি করুন"
+                onAction={() => { window.location.href = '/generate' }}
+              />
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="border-border">
+            <CardContent className="p-6 space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-10 rounded bg-muted/60 animate-pulse" />
+              ))}
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   )
 }

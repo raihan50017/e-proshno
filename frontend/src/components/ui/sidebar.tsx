@@ -527,3 +527,4 @@ export function SidebarMenuSkeleton({
     </div>
   )
 }
+

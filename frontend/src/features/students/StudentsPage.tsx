@@ -7,7 +7,6 @@ import {
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import { Combobox } from '@/components/ui/combobox'
 import {
   Dialog,
@@ -19,17 +18,8 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import { EmptyState } from '@/components/shared/empty-state'
+import { AppDataTable, type AppDataTableColumn } from '@/components/shared/app-data-table'
 import { PageHeader } from '@/components/shared/page-header'
-import { SearchInput } from '@/components/shared/search-input'
 import { useListBatches, useListStudents } from '@/lib/api/generated/students/students'
 import type { BatchDto, StudentDto } from '@/lib/api/model'
 import { apiClient } from '@/lib/api-client'
@@ -76,9 +66,10 @@ export function StudentsPage() {
     }
   }, [batches, batchId])
 
-  const filteredStudents = students.filter((st) =>
-    st.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    st.roll.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredStudents = students.filter(
+    (st) =>
+      st.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      st.roll.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
   const batchOptions = React.useMemo(
@@ -165,6 +156,44 @@ export function StudentsPage() {
     }
   }
 
+  // ── AppDataTable column definitions ──────────────────────────────────────────
+  const columns: AppDataTableColumn<StudentDto>[] = [
+    {
+      key: 'roll',
+      header: 'রোল',
+      headerClassName: 'w-20',
+      cellClassName: 'font-bold text-foreground',
+      render: (st) => toBnDigits(st.roll),
+    },
+    {
+      key: 'name',
+      header: 'শিক্ষার্থীর নাম',
+      cellClassName: 'font-medium text-foreground',
+      render: (st) => st.name,
+    },
+    {
+      key: 'batch',
+      header: 'ব্যাচ',
+      cellClassName: 'text-xs text-muted-foreground',
+      render: (st) => st.batchName || 'সাধারণ',
+    },
+    {
+      key: 'phone',
+      header: 'মোবাইল নম্বর',
+      cellClassName: 'text-xs text-muted-foreground',
+      render: (st) => (st.phone ? toBnDigits(st.phone) : '—'),
+    },
+    {
+      key: 'status',
+      header: 'অবস্থা',
+      render: () => (
+        <Badge className="text-[11px] bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20">
+          সক্রিয়
+        </Badge>
+      ),
+    },
+  ]
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -190,98 +219,42 @@ export function StudentsPage() {
               onClick={() => setStudentDialogOpen(true)}
             >
               <Plus className="size-4" />
-              নতুন শিক্ষার্থী যোগ করুন
+              নতুন শিক্ষার্থী
             </Button>
           </div>
         }
       />
 
-      {/* Filter and Search */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <SearchInput
-            placeholder="রোল বা নাম দিয়ে খুঁজুন..."
-            value={searchQuery}
-            onChange={setSearchQuery}
-            className="h-10 text-xs sm:w-72"
-          />
-
-          <div className="w-56 shrink-0">
+      {/* Students AppDataTable */}
+      <AppDataTable<StudentDto>
+        data={filteredStudents}
+        columns={columns}
+        isLoading={isLoading}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder="রোল বা নাম দিয়ে খুঁজুন..."
+        filterSlots={
+          <div className="w-52">
             <Combobox
               options={filterBatchOptions}
               value={selectedBatchId}
               onChange={setSelectedBatchId}
               placeholder="সকল ব্যাচ"
               searchPlaceholder="ব্যাচ খুঁজুন..."
-              triggerClassName="h-10 text-xs"
+              triggerClassName="h-9 text-xs"
             />
           </div>
-        </div>
-
-        <div className="text-xs text-muted-foreground shrink-0">
-          মোট শিক্ষার্থী: <strong className="text-foreground">{toBnDigits(students.length)}</strong> জন
-        </div>
-      </div>
-
-      {/* Students Table */}
-      <Card className="border-border">
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="p-8 space-y-3">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-12 rounded bg-muted/60 animate-pulse" />
-              ))}
-            </div>
-          ) : filteredStudents.length > 0 ? (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>রোল</TableHead>
-                    <TableHead>শিক্ষার্থীর নাম</TableHead>
-                    <TableHead>ব্যাচ</TableHead>
-                    <TableHead>মোবাইল নম্বর</TableHead>
-                    <TableHead>অবস্থা</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredStudents.map((st) => (
-                    <TableRow key={st.id}>
-                      <TableCell className="font-bold text-foreground">
-                        {toBnDigits(st.roll)}
-                      </TableCell>
-                      <TableCell className="font-medium text-foreground">
-                        {st.name}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {st.batchName || 'সাধারণ'}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {st.phone ? toBnDigits(st.phone) : '—'}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="success" className="text-[11px]">
-                          সক্রিয়
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <div className="p-6">
-              <EmptyState
-                icon={Users}
-                title="কোনো শিক্ষার্থী পাওয়া যায়নি"
-                description="আপনার প্রতিষ্ঠানের শিক্ষার্থীদের যোগ করুন যাতে অনলাইন পরীক্ষা ও ওএমআর রেজাল্ট তৈরি করতে পারেন।"
-                actionLabel="নতুন শিক্ষার্থী যোগ করুন"
-                onAction={() => setStudentDialogOpen(true)}
-              />
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        }
+        countLabel="জন শিক্ষার্থী"
+        totalCount={students.length}
+        filteredCount={filteredStudents.length}
+        emptyIcon={Users}
+        emptyTitle="কোনো শিক্ষার্থী পাওয়া যায়নি"
+        emptyDescription="আপনার প্রতিষ্ঠানের শিক্ষার্থীদের যোগ করুন যাতে অনলাইন পরীক্ষা ও ওএমআর রেজাল্ট তৈরি করতে পারেন।"
+        emptyActionLabel="নতুন শিক্ষার্থী যোগ করুন"
+        onEmptyAction={() => setStudentDialogOpen(true)}
+        getRowKey={(st) => st.id}
+      />
 
       {/* Create Student Dialog */}
       <Dialog open={studentDialogOpen} onOpenChange={setStudentDialogOpen}>
