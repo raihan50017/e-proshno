@@ -165,8 +165,9 @@ public sealed class QuestionReader(AppDbContext db, ITenantContext tenant)
             return tenant.IsInRole(Roles.SuperAdmin) || tenant.IsInRole(Roles.ContentEditor);
         }
 
-        return bankOwnerId is not null
-               && (bankOwnerId == tenant.CurrentUserId || createdById == tenant.CurrentUserId || tenant.IsInstitutionAdmin);
+        return (bankOwnerId is not null && bankOwnerId == tenant.CurrentUserId)
+               || createdById == tenant.CurrentUserId
+               || tenant.IsInstitutionAdmin;
     }
 
     private sealed class CardRow

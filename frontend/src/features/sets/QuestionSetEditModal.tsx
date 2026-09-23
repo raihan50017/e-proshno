@@ -29,7 +29,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { apiClient } from '@/lib/api-client'
 import { toBnDigits } from '@/lib/bn'
-import { QuestionEditModal } from '@/features/question-bank/QuestionEditModal'
+import { QuestionUpsertModal } from '@/features/question-bank/QuestionUpsertModal'
+import { RichText } from '@/components/shared/rich-text'
 import type { QuestionCard } from '@/lib/api/model/questionCard'
 
 interface QuestionSetEditModalProps {
@@ -299,16 +300,16 @@ export function QuestionSetEditModal({
 
   return (
     <>
-      <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden">
-        <DialogHeader className="p-4 sm:p-5 border-b border-border bg-muted/20">
+      <Dialog open={isOpen && !editingQuestion} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-5xl w-[96vw] h-[92vh] max-h-[95vh] sm:h-[90vh] sm:max-h-[92vh] flex flex-col p-0 overflow-hidden shadow-2xl">
+        <DialogHeader className="shrink-0 p-4 sm:px-6 sm:py-3.5 border-b border-border bg-muted/20">
           <div className="flex items-center gap-2 text-primary">
             <Edit3 className="size-5" />
-            <DialogTitle className="text-base font-semibold">
+            <DialogTitle className="text-base font-bold">
               প্রশ্নসেট সম্পাদনা ও পরিবর্তন
             </DialogTitle>
           </div>
-          <DialogDescription className="text-xs">
+          <DialogDescription className="text-xs text-muted-foreground">
             {rawSetDetail ? `${rawSetDetail.levelName} · ${rawSetDetail.subjectLabel} · ` : ''}
             শিরোনাম, সময়, প্রশ্নের ক্রম এবং নম্বর পুনর্নির্ধারণ করুন
           </DialogDescription>
@@ -322,7 +323,7 @@ export function QuestionSetEditModal({
           </div>
         ) : (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-            <div className="px-4 sm:px-5 pt-3 border-b border-border bg-card">
+            <div className="px-4 sm:px-5 pt-3 pb-2 border-b border-border bg-card flex flex-wrap items-center justify-between gap-2">
               <TabsList className="bg-muted/80 p-1 border border-border">
                 <TabsTrigger value="info" className="gap-1.5 text-xs font-medium">
                   <Settings2 className="size-3.5" />
@@ -337,6 +338,21 @@ export function QuestionSetEditModal({
                   আরও প্রশ্ন যোগ করুন
                 </TabsTrigger>
               </TabsList>
+
+              {/* Live Marks Counter Badge */}
+              <div className="flex items-center gap-2 text-xs">
+                <Badge
+                  variant="outline"
+                  className={`text-xs px-2.5 py-0.5 font-semibold ${
+                    currentTotalMarks === fullMarks
+                      ? 'border-emerald-500/50 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                      : 'border-amber-500/50 bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
+                  }`}
+                >
+                  মোট নম্বর: {toBnDigits(currentTotalMarks)} / {toBnDigits(fullMarks)}
+                  {currentTotalMarks === fullMarks ? ' (সম্পূর্ণ)' : ''}
+                </Badge>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 sm:p-5">
@@ -476,9 +492,9 @@ export function QuestionSetEditModal({
 
                         {/* Question stem snippet */}
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-foreground line-clamp-2 leading-relaxed">
-                            {item.stem || 'প্রশ্ন লোড হচ্ছে...'}
-                          </p>
+                          <div className="font-medium text-foreground line-clamp-2 leading-relaxed">
+                            <RichText content={item.stem || 'প্রশ্ন লোড হচ্ছে...'} />
+                          </div>
                           {item.chapterName && (
                             <span className="text-[11px] text-muted-foreground">
                               অধ্যায়: {item.chapterName}
@@ -600,9 +616,9 @@ export function QuestionSetEditModal({
                           className="flex items-center justify-between gap-3 p-3 rounded-lg border border-border bg-card hover:bg-muted/30 text-xs"
                         >
                           <div className="space-y-1 min-w-0">
-                            <p className="font-medium text-foreground line-clamp-2 leading-relaxed">
-                              {typeof q.stem === 'string' ? q.stem : q.stemText}
-                            </p>
+                            <div className="font-medium text-foreground line-clamp-2 leading-relaxed">
+                              <RichText content={q.stem || q.stemText} />
+                            </div>
                             {q.chapterName && (
                               <span className="text-[11px] text-muted-foreground">
                                 অধ্যায়: {q.chapterName}
@@ -648,8 +664,8 @@ export function QuestionSetEditModal({
           </Tabs>
         )}
 
-        <DialogFooter className="p-3 border-t border-border bg-background">
-          <Button type="button" variant="outline" size="sm" onClick={onClose} className="text-xs">
+        <DialogFooter className="shrink-0 p-3 sm:px-6 border-t border-border bg-muted/20">
+          <Button type="button" variant="outline" size="sm" onClick={onClose} className="text-xs h-8.5 px-4">
             বন্ধ করুন
           </Button>
         </DialogFooter>
@@ -657,9 +673,10 @@ export function QuestionSetEditModal({
     </Dialog>
 
     {/* In-place Question Editor */}
-    <QuestionEditModal
+    <QuestionUpsertModal
       question={editingQuestion}
       isOpen={Boolean(editingQuestion)}
+      bankId={editingQuestion?.bankId || undefined}
       onClose={() => setEditingQuestion(null)}
       onSuccess={() => {
         setEditingQuestion(null)

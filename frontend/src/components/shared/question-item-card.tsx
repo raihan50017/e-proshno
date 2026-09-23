@@ -1,4 +1,4 @@
-import { CheckCircle2, Copy, Edit3, Flag, PlusCircle, Star } from 'lucide-react'
+import { CheckCircle2, Copy, Edit3, Flag, PlusCircle, Star, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -15,6 +15,7 @@ export interface QuestionItemCardProps {
   onCopy?: (question: QuestionCard) => void
   onReport?: (question: QuestionCard) => void
   onEdit?: (question: QuestionCard) => void
+  onDelete?: (question: QuestionCard) => void
   onAddToSet?: (question: QuestionCard) => void
   showActions?: boolean
   className?: string
@@ -28,6 +29,7 @@ export function QuestionItemCard({
   onCopy,
   onReport,
   onEdit,
+  onDelete,
   onAddToSet,
   showActions = true,
   className,
@@ -190,16 +192,30 @@ export function QuestionItemCard({
                   সেটে যোগ
                 </Button>
               )}
-              {onEdit && (question.canEdit || question.bankId) && (
+              {onEdit && (
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
                   className="h-7 text-xs px-2 gap-1 text-primary hover:bg-primary/10"
                   onClick={() => onEdit(question)}
+                  title={question.bankId || question.canEdit ? 'প্রশ্ন সম্পাদনা করুন' : 'প্রশ্ন কাস্টমাইজ করে নিজস্ব ব্যাংকে নিন'}
                 >
                   <Edit3 className="size-3" />
-                  সম্পাদনা
+                  {question.bankId || question.canEdit ? 'সম্পাদনা' : 'কাস্টমাইজ'}
+                </Button>
+              )}
+              {onDelete && (question.canEdit || Boolean(question.bankId)) && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs px-2 gap-1 text-rose-500 hover:bg-rose-500/10 hover:text-rose-600"
+                  onClick={() => onDelete(question)}
+                  title="প্রশ্ন মুছে ফেলুন"
+                >
+                  <Trash2 className="size-3" />
+                  মুছুন
                 </Button>
               )}
               {onCopy && (

@@ -6,6 +6,7 @@ import {
   Download,
   Eye,
   EyeOff,
+  FileCheck2,
   Loader2,
   MonitorPlay,
   Printer,
@@ -166,6 +167,22 @@ export function PaperPrintPage() {
               >
                 <MonitorPlay className="size-3.5" />
                 স্মার্টবোর্ড
+              </Button>
+            </Link>
+          )}
+
+          {/* OMR Sheet Generator */}
+          {id && (
+            <Link to={`/omr?setId=${id}`}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs gap-1.5 border-purple-500/30 text-purple-700 dark:text-purple-400 hover:bg-purple-500/10"
+                title="এই প্রশ্নসেটের জন্য ওএমআর (OMR) শীট তৈরি করুন"
+              >
+                <FileCheck2 className="size-3.5" />
+                ওএমআর শীট
               </Button>
             </Link>
           )}

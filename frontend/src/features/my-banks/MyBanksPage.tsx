@@ -1,10 +1,14 @@
 import * as React from 'react'
+import { Link } from 'react-router-dom'
 import {
   Download,
   FolderPlus,
   Lock,
   Plus,
+  PlusCircle,
   Share2,
+  Trash2,
+  UploadCloud,
   Users,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -22,9 +26,12 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { EmptyState } from '@/components/shared/empty-state'
 import { PageHeader } from '@/components/shared/page-header'
+import { QuestionUpsertModal } from '@/features/question-bank/QuestionUpsertModal'
 import { useListBanks } from '@/lib/api/generated/question-banks/question-banks'
+import type { BankDto } from '@/lib/api/model'
 import { apiClient } from '@/lib/api-client'
 import { toBnDigits } from '@/lib/bn'
 
@@ -37,6 +44,34 @@ export function MyBanksPage() {
   const [description, setDescription] = React.useState('')
   const [sharing, setSharing] = React.useState<'Private' | 'Institution'>('Private')
   const [isCreating, setIsCreating] = React.useState(false)
+
+  // Add Question to specific bank
+  const [addQuestionBank, setAddQuestionBank] = React.useState<BankDto | null>(null)
+
+  // Archive / Delete Bank
+  const [archiveTargetBank, setArchiveTargetBank] = React.useState<BankDto | null>(null)
+  const [isArchiving, setIsArchiving] = React.useState(false)
+
+  const handleArchiveBank = async () => {
+    if (!archiveTargetBank) return
+    setIsArchiving(true)
+    try {
+      await apiClient.post(`/api/v1/question-banks/${archiveTargetBank.id}/archive`)
+      toast.success(`"${archiveTargetBank.name}" ব্যাংকটি সফলভাবে আর্কাইভ করা হয়েছে`)
+      setArchiveTargetBank(null)
+      refetch()
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail || 'ব্যাংক আর্কাইভ করতে সমস্যা হয়েছে'
+      toast.error(msg)
+    } finally {
+      setIsArchiving(false)
+    }
+  }
+
+  const handleExportBank = (bank: BankDto) => {
+    window.open(`/api/v1/question-banks/${bank.id}/export?format=Xlsx`, '_blank')
+    toast.success(`"${bank.name}" এক্সপোর্ট শুরু হয়েছে`)
+  }
 
   const handleCreateBank = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -188,21 +223,34 @@ export function MyBanksPage() {
             <Card key={bank.id} className="border-border flex flex-col justify-between hover:border-primary/40 transition-colors">
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-2">
-                  <Badge variant={bank.sharing === 0 ? 'secondary' : 'info'} className="text-[11px] gap-1">
-                    {bank.sharing === 0 ? (
-                      <>
-                        <Lock className="size-3" /> ব্যক্তিগত
-                      </>
-                    ) : (
-                      <>
-                        <Share2 className="size-3" /> প্রাতিষ্ঠানিক
-                      </>
-                    )}
-                  </Badge>
-                  {bank.isDefault && (
-                    <Badge variant="outline" className="text-[10px]">
-                      ডিফল্ট
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <Badge variant={bank.sharing === 0 ? 'secondary' : 'info'} className="text-[11px] gap-1">
+                      {bank.sharing === 0 ? (
+                        <>
+                          <Lock className="size-3" /> ব্যক্তিগত
+                        </>
+                      ) : (
+                        <>
+                          <Share2 className="size-3" /> প্রাতিষ্ঠানিক
+                        </>
+                      )}
                     </Badge>
+                    {bank.isDefault && (
+                      <Badge variant="outline" className="text-[10px]">
+                        ডিফল্ট
+                      </Badge>
+                    )}
+                  </div>
+                  {!bank.isDefault && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7 text-muted-foreground hover:text-rose-600"
+                      title="ব্যাংক আর্কাইভ করুন"
+                      onClick={() => setArchiveTargetBank(bank)}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
                   )}
                 </div>
                 <CardTitle className="text-base font-semibold pt-2 leading-snug">
@@ -228,11 +276,11 @@ export function MyBanksPage() {
                 </div>
               </CardContent>
 
-              <CardFooter className="pt-3 border-t border-border/60 flex items-center justify-between gap-2 bg-muted/20">
+              <CardFooter className="pt-3 border-t border-border/60 flex items-center justify-between gap-1.5 flex-wrap bg-muted/20">
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8 text-xs flex-1"
+                  className="h-8 text-xs px-2.5"
                   onClick={() => {
                     window.location.href = `/question-bank?bankId=${bank.id}`
                   }}
@@ -240,12 +288,30 @@ export function MyBanksPage() {
                   প্রশ্ন দেখুন
                 </Button>
                 <Button
+                  variant="default"
+                  size="sm"
+                  className="h-8 text-xs px-2 gap-1"
+                  onClick={() => setAddQuestionBank(bank)}
+                >
+                  <PlusCircle className="size-3.5" />
+                  + প্রশ্ন যোগ
+                </Button>
+                <Link to={`/imports?bankId=${bank.id}`}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs px-2 gap-1 text-primary border-primary/30 hover:bg-primary/10"
+                  >
+                    <UploadCloud className="size-3.5" />
+                    ইমপোর্ট
+                  </Button>
+                </Link>
+                <Button
                   variant="ghost"
                   size="sm"
-                  className="h-8 text-xs gap-1"
-                  onClick={() => {
-                    toast.info(`"${bank.name}" এক্সপোর্ট প্রস্তুত করা হচ্ছে...`)
-                  }}
+                  className="h-8 text-xs px-2 gap-1"
+                  onClick={() => handleExportBank(bank)}
+                  title="এক্সেল ফরম্যাটে এক্সপোর্ট করুন"
                 >
                   <Download className="size-3.5" />
                   এক্সপোর্ট
@@ -263,6 +329,28 @@ export function MyBanksPage() {
           onAction={() => setDialogOpen(true)}
         />
       )}
+
+      {/* Add Question to Bank Modal */}
+      <QuestionUpsertModal
+        isOpen={Boolean(addQuestionBank)}
+        bankId={addQuestionBank?.id}
+        subjectId={addQuestionBank?.subjectId || undefined}
+        onClose={() => setAddQuestionBank(null)}
+        onSuccess={() => refetch()}
+      />
+
+      {/* Archive Bank Confirmation Dialog */}
+      <ConfirmDialog
+        open={Boolean(archiveTargetBank)}
+        onOpenChange={(open) => !open && setArchiveTargetBank(null)}
+        title="প্রশ্নব্যাংক আর্কাইভ নিশ্চিতকরণ"
+        description={`আপনি কি নিশ্চিতভাবে "${archiveTargetBank?.name}" প্রশ্নব্যাংকটি আর্কাইভ করতে চান?`}
+        confirmText="আর্কাইভ করুন"
+        cancelText="বাতিল"
+        confirmVariant="destructive"
+        loading={isArchiving}
+        onConfirm={handleArchiveBank}
+      />
     </div>
   )
 }

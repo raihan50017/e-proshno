@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft,
   ChevronLeft,
@@ -63,8 +63,9 @@ interface FlatQuestion extends PaperQuestion {
 }
 
 export function SmartboardPage() {
+  const { setId: routeSetId } = useParams<{ setId?: string }>()
   const [searchParams, setSearchParams] = useSearchParams()
-  const activeSetId = searchParams.get('setId')
+  const activeSetId = routeSetId || searchParams.get('setId')
 
   // Set Selection State
   const [sets, setSets] = React.useState<QuestionSetSummary[]>([])

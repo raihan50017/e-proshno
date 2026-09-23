@@ -9,7 +9,7 @@ import type { QuestionType } from './questionType';
 import type { SearchFilters } from './searchFilters';
 
 export interface SearchQuestionsQuery {
-  subjectId: string;
+  subjectId?: string | null;
   chapterIds: string[];
   type?: QuestionType | null;
   source: QuestionSource;

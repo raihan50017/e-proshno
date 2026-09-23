@@ -1,26 +1,44 @@
 import * as React from 'react'
-import { useNavigate } from 'react-router-dom'
-import {
-  Layers,
-  Sparkles,
-  HelpCircle,
-  FileText,
-} from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { PageHeader } from '@/components/shared/page-header'
-import { Combobox } from '@/components/ui/combobox'
-import type { LevelDto, SubjectDto, ChapterDto } from '@/lib/api/model'
+import { useAuth } from '@/features/auth/auth-context'
 import { useListLevels, useListSubjects, useListChapters } from '@/lib/api/generated/taxonomy/taxonomy'
 import { apiClient } from '@/lib/api-client'
-import { toBnDigits } from '@/lib/bn'
+import type { LevelDto, SubjectDto, ChapterDto } from '@/lib/api/model'
+import { GenerateStepCreate } from './GenerateStepCreate'
+import { GenerateStepCreated } from './GenerateStepCreated'
+import { GenerateStepPicker } from './GenerateStepPicker'
+import { GenerateStepPreview } from './GenerateStepPreview'
+
+type GenerateStep = 'create' | 'created' | 'picker' | 'preview'
 
 export function GeneratePage() {
-  const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const { user, activeInstitution } = useAuth()
+  const teacherName = user?.fullName || activeInstitution?.name || 'Md. Aburayhan'
+
+  // Step state
+  const stepParam = searchParams.get('step') as GenerateStep | null
+  const setIdParam = searchParams.get('setId')
+  const [step, setStep] = React.useState<GenerateStep>(stepParam || 'create')
+  const [createdSetId, setCreatedSetId] = React.useState<string>(setIdParam || '')
+
+  // Form Fields
+  const [title, setTitle] = React.useState('Test-Exam')
+  const [selectedLevelId, setSelectedLevelId] = React.useState<string>('')
+  const [selectedSubjectId, setSelectedSubjectId] = React.useState<string>('')
+  const [selectedChapterId, setSelectedChapterId] = React.useState<string>('')
+  const [questionType, setQuestionType] = React.useState<'Mcq' | 'Cq'>('Mcq')
+  const [questionCount, setQuestionCount] = React.useState<number>(30)
+  const [durationMin, setDurationMin] = React.useState<number>(30)
+  const [fullMarks, setFullMarks] = React.useState<number>(30)
+
+  // Question selection in picker
+  const [selectedQuestionIds, setSelectedQuestionIds] = React.useState<string[]>([])
+  const [isSubmitting, setIsSubmitting] = React.useState(false)
+  const [isSaving, setIsSaving] = React.useState(false)
+
+  // Taxonomy queries
   const { data: levelsData, isLoading: levelsLoading } = useListLevels()
   const levels: LevelDto[] = React.useMemo(() => {
     if (!levelsData) return []
@@ -29,7 +47,6 @@ export function GeneratePage() {
     return []
   }, [levelsData])
 
-  const [selectedLevelId, setSelectedLevelId] = React.useState<string>('')
   const { data: subjectsData, isLoading: subjectsLoading } = useListSubjects(
     selectedLevelId ? { levelId: selectedLevelId } : undefined,
     { query: { enabled: Boolean(selectedLevelId) } }
@@ -40,16 +57,6 @@ export function GeneratePage() {
     if ('data' in subjectsData && Array.isArray((subjectsData as any).data)) return (subjectsData as any).data
     return []
   }, [subjectsData])
-
-  const [title, setTitle] = React.useState('')
-  const [selectedSubjectId, setSelectedSubjectId] = React.useState<string>('')
-  const [questionType, setQuestionType] = React.useState<'Mcq' | 'Cq'>('Mcq')
-  const [questionCount, setQuestionCount] = React.useState(10)
-  const [durationMin, setDurationMin] = React.useState(20)
-  const [fullMarks, setFullMarks] = React.useState(10)
-  const [source, setSource] = React.useState<'Platform' | 'MyBanks' | 'Both'>('Both')
-  const [selectedChapterIds, setSelectedChapterIds] = React.useState<string[]>([])
-  const [isSubmitting, setIsSubmitting] = React.useState(false)
 
   const { data: chaptersData, isLoading: chaptersLoading } = useListChapters(
     selectedSubjectId,
@@ -62,94 +69,98 @@ export function GeneratePage() {
     return []
   }, [chaptersData])
 
-  const levelOptions = React.useMemo(
-    () =>
-      levels.map((lvl) => ({
-        value: lvl.id,
-        label: lvl.nameBn,
-      })),
-    [levels]
-  )
-
-  const subjectOptions = React.useMemo(
-    () =>
-      subjects.map((sub) => ({
-        value: sub.id,
-        label: `${sub.label || sub.nameBn}${sub.paper ? ` (${toBnDigits(sub.paper)}য় পত্র)` : ''}`,
-      })),
-    [subjects]
-  )
-
+  // Sync defaults
   React.useEffect(() => {
     if (levels.length > 0 && !selectedLevelId) {
-      setSelectedLevelId(levels[0].id)
+      // Prefer HSC if available
+      const hsc = levels.find((l) => l.nameBn.includes('এইচএসসি') || (l.slug && l.slug.toLowerCase().includes('hsc')))
+      setSelectedLevelId(hsc ? hsc.id : levels[0].id)
     }
   }, [levels, selectedLevelId])
 
   React.useEffect(() => {
     if (subjects.length > 0 && !selectedSubjectId) {
-      setSelectedSubjectId(subjects[0].id)
+      // Prefer Physics 2nd Paper if available
+      const phy = subjects.find((s) => s.nameBn.includes('পদার্থ') && s.paper === 2) || subjects[0]
+      setSelectedSubjectId(phy.id)
     }
   }, [subjects, selectedSubjectId])
 
   React.useEffect(() => {
-    if (chapters.length > 0) {
-      setSelectedChapterIds(chapters.map((c) => c.id))
-    } else {
-      setSelectedChapterIds([])
+    if (chapters.length > 0 && !selectedChapterId) {
+      setSelectedChapterId(chapters[0].id)
     }
-  }, [chapters])
+  }, [chapters, selectedChapterId])
 
-  const toggleChapter = (chapterId: string) => {
-    setSelectedChapterIds((prev) =>
-      prev.includes(chapterId)
-        ? prev.filter((id) => id !== chapterId)
-        : [...prev, chapterId]
-    )
-  }
-
-  const toggleAllChapters = () => {
-    if (selectedChapterIds.length === chapters.length) {
-      setSelectedChapterIds([])
-    } else {
-      setSelectedChapterIds(chapters.map((c) => c.id))
+  // Load existing set items if setIdParam is provided
+  React.useEffect(() => {
+    if (setIdParam && !selectedQuestionIds.length) {
+      apiClient
+        .get(`/api/v1/question-sets/${setIdParam}`)
+        .then((res) => {
+          const s = res.data
+          if (s) {
+            setTitle(s.title || 'Test-Exam')
+            if (s.subjectId) setSelectedSubjectId(s.subjectId)
+            if (s.levelId) setSelectedLevelId(s.levelId)
+            if (s.chapterIds && s.chapterIds.length > 0) setSelectedChapterId(s.chapterIds[0])
+            if (s.targetCount) setQuestionCount(s.targetCount)
+            if (s.durationMin) setDurationMin(s.durationMin)
+            if (s.fullMarks) setFullMarks(s.fullMarks)
+            if (s.items && Array.isArray(s.items)) {
+              setSelectedQuestionIds(s.items.map((it: any) => it.questionId || it.id))
+            }
+          }
+        })
+        .catch(() => {})
     }
-  }
+  }, [setIdParam])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Active labels
+  const activeLevel = levels.find((l) => l.id === selectedLevelId)
+  const activeSubject = subjects.find((s) => s.id === selectedSubjectId)
+  const activeChapter = chapters.find((c) => c.id === selectedChapterId)
+
+  const activeLevelName = activeLevel?.nameBn || 'এইচএসসি'
+  const activeSubjectName = activeSubject
+    ? `${activeSubject.label || activeSubject.nameBn}${activeSubject.paper ? ` (${activeSubject.paper}য় পত্র)` : ''}`
+    : 'পদার্থবিজ্ঞান ২য় পত্র'
+  const activeChapterName = activeChapter
+    ? `অধ্যায় ${activeChapter.number} - ${activeChapter.nameBn}`
+    : 'অধ্যায় ১ - তাপগতিবিদ্যা'
+
+  // Step 1: Create Question Set
+  const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!title.trim()) {
-      toast.error('প্রশ্নপত্রের শিরোনাম লিখুন')
+      toast.error('পরীক্ষার শিরোনাম লিখুন')
       return
     }
     if (!selectedLevelId) {
-      toast.error('অনুগ্রহ করে শ্রেণি বা স্তর নির্বাচন করুন')
+      toast.error('শ্রেণি নির্বাচন করুন')
       return
     }
     if (!selectedSubjectId) {
-      toast.error('অনুগ্রহ করে বিষয় নির্বাচন করুন')
+      toast.error('বিষয় নির্বাচন করুন')
       return
     }
-    if (selectedChapterIds.length === 0) {
-      toast.error('কমপক্ষে একটি অধ্যায় নির্বাচন করুন')
+    if (!selectedChapterId) {
+      toast.error('অধ্যায় নির্বাচন করুন')
       return
     }
 
     setIsSubmitting(true)
     try {
       const typeNum = questionType === 'Mcq' ? 0 : 1
-      const sourceNum = source === 'Platform' ? 0 : source === 'MyBanks' ? 1 : 2
-      const modeNum = 1 // Auto-selection mode
 
-      // Step 1: Create question set scope
       const res = await apiClient.post('/api/v1/question-sets', {
         title: title.trim(),
         levelId: selectedLevelId,
         subjectId: selectedSubjectId,
-        chapterIds: selectedChapterIds,
+        chapterIds: [selectedChapterId],
         type: typeNum,
-        mode: modeNum,
-        source: sourceNum,
+        mode: 0,
+        source: 2, // Both Platform & Bank
         bankIds: [],
         targetCount: questionCount,
         durationMin,
@@ -158,353 +169,136 @@ export function GeneratePage() {
 
       const newId = res.data?.id
       if (newId) {
-        // Step 2: Auto-select questions from database
-        try {
-          const autoRes = await apiClient.post(`/api/v1/question-sets/${newId}/auto-select`, {
-            keepExisting: false,
-            targetCount: questionCount,
-          })
-          const questionIds: string[] = autoRes.data?.questionIds || []
-
-          if (questionIds.length > 0) {
-            // Step 3: Save selected questions into set
-            await apiClient.put(`/api/v1/question-sets/${newId}/items`, {
-              items: questionIds.map((qid) => ({
-                questionId: qid,
-                marks: typeNum === 0 ? 1 : 10,
-              })),
-            })
-          }
-        } catch (autoErr) {
-          console.warn('Auto-select completed with note:', autoErr)
-        }
-
-        toast.success('প্রশ্নপত্র সফলভাবে তৈরি হয়েছে!')
-        navigate(`/sets?id=${newId}`)
+        setCreatedSetId(newId)
+        setStep('created')
+        setSearchParams({ step: 'created', setId: newId }, { replace: true })
+        toast.success('প্রশ্নসেট সফলভাবে তৈরি হয়েছে!')
       }
     } catch (err: any) {
       const data = err?.response?.data
       let errorMsg = ''
       if (data?.errors && typeof data.errors === 'object') {
-        const firstError = Object.values(data.errors)[0]
-        if (Array.isArray(firstError) && firstError.length > 0) {
-          errorMsg = firstError[0]
+        const first = Object.values(data.errors)[0]
+        if (Array.isArray(first) && first.length > 0) {
+          errorMsg = first[0] as string
         }
       }
-      if (!errorMsg) {
-        errorMsg = data?.title || data?.detail || data?.message || 'প্রশ্নসেট তৈরিতে সমস্যা হয়েছে'
+      if (!errorMsg && data?.detail) {
+        errorMsg = data.detail
       }
-      toast.error(errorMsg)
+      toast.error(errorMsg || 'প্রশ্নসেট তৈরিতে সমস্যা হয়েছে')
     } finally {
       setIsSubmitting(false)
     }
   }
 
+  // Step 2 -> Step 3
+  const handleAddQuestionsFromCreated = () => {
+    setStep('picker')
+    setSearchParams({ step: 'picker', setId: createdSetId }, { replace: true })
+  }
+
+  // Save items into Question Set
+  const handleSaveSetItems = async () => {
+    if (!createdSetId) return
+    setIsSaving(true)
+    try {
+      const marksPerItem = questionType === 'Mcq' ? 1 : 10
+      await apiClient.put(`/api/v1/question-sets/${createdSetId}/items`, {
+        items: selectedQuestionIds.map((qid) => ({
+          questionId: qid,
+          marks: marksPerItem,
+        })),
+      })
+      toast.success('প্রশ্নসেট সফলভাবে সংরক্ষিত হয়েছে!')
+    } catch {
+      toast.error('প্রশ্ন সংরক্ষণ করতে সমস্যা হয়েছে')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // Step 3 -> Step 4
+  const handleGoToPreview = async () => {
+    if (selectedQuestionIds.length > 0) {
+      await handleSaveSetItems()
+    }
+    setStep('preview')
+    setSearchParams({ step: 'preview', setId: createdSetId }, { replace: true })
+  }
+
+  // Step 4 -> Step 3
+  const handleBackToPicker = () => {
+    setStep('picker')
+    setSearchParams({ step: 'picker', setId: createdSetId }, { replace: true })
+  }
+
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="১ ক্লিকে প্রশ্নপত্র তৈরি"
-        description="সিলেবাস, অধ্যায় ও প্রশ্নের ধরন নির্ধারণ করে দ্রুত প্রশ্নপত্র তৈরি ও প্রিন্ট করুন"
-        breadcrumbs={[
-          { label: 'ড্যাশবোর্ড', href: '/dashboard' },
-          { label: 'প্রশ্ন তৈরি' },
-        ]}
-      />
+    <div>
+      {/* Step 1: 1-Click Generation Card (Matching 1.png) */}
+      {step === 'create' && (
+        <GenerateStepCreate
+          title={title}
+          setTitle={setTitle}
+          selectedLevelId={selectedLevelId}
+          setSelectedLevelId={setSelectedLevelId}
+          levels={levels}
+          levelsLoading={levelsLoading}
+          selectedSubjectId={selectedSubjectId}
+          setSelectedSubjectId={setSelectedSubjectId}
+          subjects={subjects}
+          subjectsLoading={subjectsLoading}
+          selectedChapterId={selectedChapterId}
+          setSelectedChapterId={setSelectedChapterId}
+          chapters={chapters}
+          chaptersLoading={chaptersLoading}
+          questionType={questionType}
+          setQuestionType={setQuestionType}
+          questionCount={questionCount}
+          setQuestionCount={setQuestionCount}
+          isSubmitting={isSubmitting}
+          onSubmit={handleCreateSubmit}
+        />
+      )}
 
-      <form onSubmit={handleSubmit}>
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Main Form (2 cols) */}
-          <div className="lg:col-span-2 space-y-6">
-            <Card className="border-border">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                  <FileText className="size-5 text-primary" />
-                  প্রাথমিক তথ্য
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  প্রশ্নপত্রের নাম, সময় এবং মোট নম্বর প্রদান করুন
-                </CardDescription>
-              </CardHeader>
+      {/* Step 2: Paper Created Sheet (Matching 2.png) */}
+      {step === 'created' && (
+        <GenerateStepCreated
+          teacherName={teacherName}
+          levelName={activeLevelName}
+          subjectName={activeSubjectName}
+          chapterName={activeChapterName}
+          durationMin={durationMin}
+          fullMarks={fullMarks}
+          onAddQuestions={handleAddQuestionsFromCreated}
+        />
+      )}
 
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="title">প্রশ্নপত্রের শিরোনাম *</Label>
-                  <Input
-                    id="title"
-                    placeholder="যেমন: ১০ম শ্রেণি - পদার্থবিজ্ঞান ১ম মডেল টেস্ট"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    required
-                  />
-                </div>
+      {/* Step 3: Interactive Question Picker (Matching 3.png) */}
+      {step === 'picker' && (
+        <GenerateStepPicker
+          setId={createdSetId}
+          title={title}
+          targetCount={questionCount}
+          selectedSubjectId={selectedSubjectId}
+          selectedChapterId={selectedChapterId}
+          chapters={chapters}
+          selectedQuestionIds={selectedQuestionIds}
+          setSelectedQuestionIds={setSelectedQuestionIds}
+          onGoToPreview={handleGoToPreview}
+          onSaveSetItems={handleSaveSetItems}
+          isSaving={isSaving}
+        />
+      )}
 
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="level">শ্রেণি / স্তর *</Label>
-                    <Combobox
-                      options={levelOptions}
-                      value={selectedLevelId}
-                      onChange={(val) => {
-                        setSelectedLevelId(val)
-                        setSelectedSubjectId('')
-                      }}
-                      placeholder="শ্রেণি / স্তর নির্বাচন করুন"
-                      searchPlaceholder="শ্রেণি খুঁজুন..."
-                      loading={levelsLoading}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="subject">বিষয় *</Label>
-                    <Combobox
-                      options={subjectOptions}
-                      value={selectedSubjectId}
-                      onChange={(val) => setSelectedSubjectId(val)}
-                      placeholder={
-                        !selectedLevelId
-                          ? 'প্রথমে শ্রেণি নির্বাচন করুন'
-                          : subjects.length === 0
-                          ? 'কোনো বিষয় পাওয়া যায়নি'
-                          : 'বিষয় নির্বাচন করুন'
-                      }
-                      searchPlaceholder="বিষয় খুঁজুন..."
-                      disabled={!selectedLevelId || subjects.length === 0}
-                      loading={subjectsLoading}
-                    />
-                  </div>
-                </div>
-
-                {/* Chapters Selection Card */}
-                {selectedSubjectId && (
-                  <div className="space-y-2 pt-2 border-t border-border/80">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm font-semibold">
-                        অন্তর্ভুক্ত অধ্যায়সমূহ * ({toBnDigits(selectedChapterIds.length)}/{toBnDigits(chapters.length)})
-                      </Label>
-                      {chapters.length > 0 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 text-xs text-primary"
-                          onClick={toggleAllChapters}
-                        >
-                          {selectedChapterIds.length === chapters.length ? 'সবগুলো বাদ দিন' : 'সবগুলো নির্বাচন'}
-                        </Button>
-                      )}
-                    </div>
-
-                    {chaptersLoading ? (
-                      <div className="text-xs text-muted-foreground p-3 bg-muted/40 rounded-md animate-pulse">
-                        অধ্যায় লোড হচ্ছে...
-                      </div>
-                    ) : chapters.length === 0 ? (
-                      <div className="text-xs text-muted-foreground p-3 bg-muted/20 rounded-md">
-                        এই বিষয়ে কোনো অধ্যায় পাওয়া যায়নি।
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto p-1 border rounded-md bg-muted/10">
-                        {chapters.map((chapter) => {
-                          const isChecked = selectedChapterIds.includes(chapter.id)
-                          return (
-                            <label
-                              key={chapter.id}
-                              className={`flex items-center gap-2 p-2 rounded text-xs cursor-pointer transition-colors border ${
-                                isChecked
-                                  ? 'bg-primary/5 border-primary/40 text-foreground font-medium'
-                                  : 'bg-card border-border/60 text-muted-foreground hover:bg-muted/40'
-                              }`}
-                            >
-                              <input
-                                type="checkbox"
-                                className="rounded text-primary size-4 accent-primary"
-                                checked={isChecked}
-                                onChange={() => toggleChapter(chapter.id)}
-                              />
-                              <span className="truncate">
-                                অধ্যায় {toBnDigits(chapter.number)}: {chapter.nameBn}
-                              </span>
-                            </label>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Question Type Selection */}
-                <div className="space-y-2 pt-2">
-                  <Label>প্রশ্নের ধরন *</Label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setQuestionType('Mcq')
-                        setQuestionCount(25)
-                        setFullMarks(25)
-                      }}
-                      className={`flex flex-col items-center justify-center p-3 rounded-lg border text-sm font-medium transition-all ${
-                        questionType === 'Mcq'
-                          ? 'border-primary bg-primary/10 text-primary ring-1 ring-primary'
-                          : 'border-input bg-card text-muted-foreground hover:bg-muted'
-                      }`}
-                    >
-                      <span className="font-semibold text-base">বহুনির্বাচনি (MCQ)</span>
-                      <span className="text-xs opacity-80 mt-0.5">৪টি বিকল্প, ওএমআর মূল্যায়নযোগ্য</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setQuestionType('Cq')
-                        setQuestionCount(8)
-                        setFullMarks(50)
-                      }}
-                      className={`flex flex-col items-center justify-center p-3 rounded-lg border text-sm font-medium transition-all ${
-                        questionType === 'Cq'
-                          ? 'border-primary bg-primary/10 text-primary ring-1 ring-primary'
-                          : 'border-input bg-card text-muted-foreground hover:bg-muted'
-                      }`}
-                    >
-                      <span className="font-semibold text-base">সৃজনশীল (CQ)</span>
-                      <span className="text-xs opacity-80 mt-0.5">উদ্দীপক ও ক, খ, গ, ঘ উপ-প্রশ্ন</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Numbers */}
-                <div className="grid gap-4 sm:grid-cols-3 pt-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="count">প্রশ্নের সংখ্যা</Label>
-                    <Input
-                      id="count"
-                      type="number"
-                      min={1}
-                      max={100}
-                      value={questionCount}
-                      onChange={(e) => setQuestionCount(Number(e.target.value))}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="duration">সময় (মিনিট)</Label>
-                    <Input
-                      id="duration"
-                      type="number"
-                      min={5}
-                      max={300}
-                      value={durationMin}
-                      onChange={(e) => setDurationMin(Number(e.target.value))}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="marks">পূর্ণমান</Label>
-                    <Input
-                      id="marks"
-                      type="number"
-                      min={1}
-                      max={200}
-                      value={fullMarks}
-                      onChange={(e) => setFullMarks(Number(e.target.value))}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Source Selection Card */}
-            <Card className="border-border">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-semibold flex items-center gap-2">
-                  <Layers className="size-4 text-primary" />
-                  প্রশ্নের উৎস (Question Source)
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  কোথা থেকে প্রশ্নসমূহ সংগ্রহ করা হবে নির্বাচন করুন
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid sm:grid-cols-3 gap-3">
-                  {[
-                    { id: 'Platform', title: 'প্ল্যাটফর্ম ব্যাংক', desc: 'অফিসিয়াল এনসিটিবি ব্যাংক' },
-                    { id: 'MyBanks', title: 'আমার প্রশ্নব্যাংক', desc: 'ব্যক্তিগত ও আমদানিকৃত প্রশ্ন' },
-                    { id: 'Both', title: 'উভয় উৎস (সুপারিশকৃত)', desc: 'প্ল্যাটফর্ম ও নিজস্ব ব্যাংক একত্রে' },
-                  ].map((s) => (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => setSource(s.id as any)}
-                      className={`p-3 rounded-lg border text-left text-sm transition-all ${
-                        source === s.id
-                          ? 'border-primary bg-primary/10 text-primary ring-1 ring-primary'
-                          : 'border-input bg-card text-muted-foreground hover:bg-muted'
-                      }`}
-                    >
-                      <p className="font-medium text-foreground">{s.title}</p>
-                      <p className="text-xs opacity-75 mt-0.5">{s.desc}</p>
-                    </button>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Right Summary Sidebar (1 col) */}
-          <div className="space-y-4">
-            <Card className="border-border bg-card">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-semibold">প্রশ্নপত্রের সারসংক্ষেপ</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                <div className="flex justify-between py-1.5 border-b border-border text-xs">
-                  <span className="text-muted-foreground">প্রশ্নের ধরন:</span>
-                  <Badge variant="outline">
-                    {questionType === 'Mcq' ? 'বহুনির্বাচনি (MCQ)' : 'সৃজনশীল (CQ)'}
-                  </Badge>
-                </div>
-
-                <div className="flex justify-between py-1.5 border-b border-border text-xs">
-                  <span className="text-muted-foreground">মোট প্রশ্ন:</span>
-                  <span className="font-semibold text-foreground">{toBnDigits(questionCount)} টি</span>
-                </div>
-
-                <div className="flex justify-between py-1.5 border-b border-border text-xs">
-                  <span className="text-muted-foreground">সময়:</span>
-                  <span className="font-semibold text-foreground">{toBnDigits(durationMin)} মিনিট</span>
-                </div>
-
-                <div className="flex justify-between py-1.5 border-b border-border text-xs">
-                  <span className="text-muted-foreground">পূর্ণমান:</span>
-                  <span className="font-semibold text-foreground">{toBnDigits(fullMarks)} নম্বর</span>
-                </div>
-
-                <div className="pt-3">
-                  <Button
-                    type="submit"
-                    className="w-full gap-2 shadow-sm font-medium"
-                    loading={isSubmitting}
-                    loadingText="তৈরি হচ্ছে..."
-                  >
-                    <Sparkles className="size-4" />
-                    প্রশ্নসেট তৈরি করুন
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="rounded-lg border border-border/80 bg-muted/40 p-4 text-xs text-muted-foreground space-y-2">
-              <p className="font-medium text-foreground flex items-center gap-1.5">
-                <HelpCircle className="size-3.5 text-primary" />
-                পরবর্তী ধাপ:
-              </p>
-              <p className="leading-relaxed">
-                সেট তৈরি হওয়ার পর আপনি পছন্দমতো প্রশ্ন যোগ, পরিবর্তন ও বাদ দিতে পারবেন এবং সরাসরি A4 ফরম্যাটে ২-কলাম প্রিন্ট করতে পারবেন।
-              </p>
-            </div>
-          </div>
-        </div>
-      </form>
+      {/* Step 4: Printable Paper & Customization (Matching 4.png) */}
+      {step === 'preview' && (
+        <GenerateStepPreview
+          setId={createdSetId}
+          onBackToPicker={handleBackToPicker}
+          teacherName={teacherName}
+        />
+      )}
     </div>
   )
 }

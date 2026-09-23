@@ -16,7 +16,7 @@ namespace EProshno.Api.Features.Questions;
 public static class SearchQuestions
 {
     public sealed record Query(
-        Guid SubjectId,
+        Guid? SubjectId,
         IReadOnlyList<Guid> ChapterIds,
         QuestionType? Type,
         QuestionSource Source,
@@ -29,9 +29,12 @@ public static class SearchQuestions
     {
         public Validator()
         {
-            RuleFor(x => x.SubjectId).NotEmpty().WithMessage(Messages.Required);
-            RuleFor(x => x.ChapterIds).Must(c => c.Count <= 100).WithMessage(Messages.InvalidValue);
-            RuleFor(x => x.BankIds).Must(c => c.Count <= 100).WithMessage(Messages.InvalidValue);
+            When(x => x.Source == QuestionSource.Platform, () =>
+            {
+                RuleFor(x => x.SubjectId).NotEmpty().WithMessage(Messages.Required);
+            });
+            RuleFor(x => x.ChapterIds).Must(c => c == null || c.Count <= 100).WithMessage(Messages.InvalidValue);
+            RuleFor(x => x.BankIds).Must(c => c == null || c.Count <= 100).WithMessage(Messages.InvalidValue);
             RuleFor(x => x.Source).IsInEnum().WithMessage(Messages.InvalidValue);
             RuleFor(x => x.Filters).NotNull().SetValidator(new FiltersValidator());
         }

@@ -116,12 +116,74 @@ public sealed class QuestionWriter(AppDbContext db, TimeProvider clock)
         await db.Entry(q).Collection(x => x.Appearances).LoadAsync(ct);
         await db.Entry(q).Collection(x => x.Tags).LoadAsync(ct);
 
-        db.McqOptions.RemoveRange(q.Options);
-        db.CqParts.RemoveRange(q.CqParts);
+        // Update options in-place if count matches
+        if (c.Type == QuestionType.Mcq && q.Options.Count == c.Options.Count)
+        {
+            for (var i = 0; i < c.Options.Count; i++)
+            {
+                q.Options[i].Index = i;
+                q.Options[i].Content = c.Options[i].Content;
+                q.Options[i].IsCorrect = c.Options[i].IsCorrect;
+            }
+        }
+        else
+        {
+            db.McqOptions.RemoveRange(q.Options);
+            q.Options.Clear();
+            if (c.Type == QuestionType.Mcq)
+            {
+                for (var i = 0; i < c.Options.Count; i++)
+                {
+                    q.Options.Add(new McqOption
+                    {
+                        Id = IdGen.New(), QuestionId = q.Id, Index = i, Content = c.Options[i].Content, IsCorrect = c.Options[i].IsCorrect
+                    });
+                }
+            }
+        }
+
+        // Update CQ parts in-place if count matches
+        if (c.Type == QuestionType.Cq && q.CqParts.Count == c.CqParts.Count)
+        {
+            for (var i = 0; i < c.CqParts.Count; i++)
+            {
+                q.CqParts[i].Part = i;
+                q.CqParts[i].Prompt = c.CqParts[i].Prompt;
+                q.CqParts[i].Marks = c.CqParts[i].Marks;
+                q.CqParts[i].Answer = c.CqParts[i].Answer;
+            }
+        }
+        else
+        {
+            db.CqParts.RemoveRange(q.CqParts);
+            q.CqParts.Clear();
+            if (c.Type == QuestionType.Cq)
+            {
+                for (var i = 0; i < c.CqParts.Count; i++)
+                {
+                    q.CqParts.Add(new CqPart
+                    {
+                        Id = IdGen.New(), QuestionId = q.Id, Part = i, Prompt = c.CqParts[i].Prompt, Marks = c.CqParts[i].Marks, Answer = c.CqParts[i].Answer
+                    });
+                }
+            }
+        }
+
+        // Appearances
         db.QuestionAppearances.RemoveRange(q.Appearances);
-        q.Options = [];
-        q.CqParts = [];
-        q.Appearances = [];
+        q.Appearances.Clear();
+        foreach (var a in c.Appearances)
+        {
+            q.Appearances.Add(new QuestionAppearance
+            {
+                Id = IdGen.New(),
+                QuestionId = q.Id,
+                Source = a.Source,
+                BoardId = a.Source == ExamSource.Board ? a.BoardId : null,
+                SchoolName = a.Source == ExamSource.Board ? null : a.SchoolName,
+                Year = a.Year,
+            });
+        }
 
         // Tag links have a composite key, so diff them instead of delete + re-add.
         var wanted = c.TagIds.ToHashSet();
@@ -160,7 +222,7 @@ public sealed class QuestionWriter(AppDbContext db, TimeProvider clock)
             q.StimulusId = null;
         }
 
-        Apply(q, c, setTags: false);
+        Apply(q, c, setTags: false, setChildren: false);
         q.UpdatedAt = clock.GetUtcNow();
         QuestionRules.Derive(q, stimulusContent);
     }
@@ -236,7 +298,7 @@ public sealed class QuestionWriter(AppDbContext db, TimeProvider clock)
     private static bool NeedsStimulus(QuestionContent c) =>
         c.Type == QuestionType.Cq || (c.Type == QuestionType.Mcq && c.McqKind == McqKind.CommonInfo);
 
-    private static void Apply(Question q, QuestionContent c, bool setTags = true)
+    private static void Apply(Question q, QuestionContent c, bool setTags = true, bool setChildren = true)
     {
         q.Type = c.Type;
         q.McqKind = c.Type == QuestionType.Mcq ? c.McqKind : null;
@@ -250,27 +312,31 @@ public sealed class QuestionWriter(AppDbContext db, TimeProvider clock)
         q.IsMath = c.IsMath;
         q.IsCommon = c.IsCommon;
 
-        q.Options = c.Type == QuestionType.Mcq
-            ? c.Options.Select((o, i) => new McqOption
-            {
-                Id = IdGen.New(), QuestionId = q.Id, Index = i, Content = o.Content, IsCorrect = o.IsCorrect,
-            }).ToList()
-            : [];
-        q.CqParts = c.Type == QuestionType.Cq
-            ? c.CqParts.Select((p, i) => new CqPart
-            {
-                Id = IdGen.New(), QuestionId = q.Id, Part = i, Prompt = p.Prompt, Marks = p.Marks, Answer = p.Answer,
-            }).ToList()
-            : [];
-        q.Appearances = c.Appearances.Select(a => new QuestionAppearance
+        if (setChildren)
         {
-            Id = IdGen.New(),
-            QuestionId = q.Id,
-            Source = a.Source,
-            BoardId = a.Source == ExamSource.Board ? a.BoardId : null,
-            SchoolName = a.Source == ExamSource.Board ? null : a.SchoolName,
-            Year = a.Year,
-        }).ToList();
+            q.Options = c.Type == QuestionType.Mcq
+                ? c.Options.Select((o, i) => new McqOption
+                {
+                    Id = IdGen.New(), QuestionId = q.Id, Index = i, Content = o.Content, IsCorrect = o.IsCorrect,
+                }).ToList()
+                : [];
+            q.CqParts = c.Type == QuestionType.Cq
+                ? c.CqParts.Select((p, i) => new CqPart
+                {
+                    Id = IdGen.New(), QuestionId = q.Id, Part = i, Prompt = p.Prompt, Marks = p.Marks, Answer = p.Answer,
+                }).ToList()
+                : [];
+            q.Appearances = c.Appearances.Select(a => new QuestionAppearance
+            {
+                Id = IdGen.New(),
+                QuestionId = q.Id,
+                Source = a.Source,
+                BoardId = a.Source == ExamSource.Board ? a.BoardId : null,
+                SchoolName = a.Source == ExamSource.Board ? null : a.SchoolName,
+                Year = a.Year,
+            }).ToList();
+        }
+
         if (setTags)
         {
             q.Tags = c.TagIds.Distinct().Select(t => new QuestionTagLink { QuestionId = q.Id, TagId = t }).ToList();

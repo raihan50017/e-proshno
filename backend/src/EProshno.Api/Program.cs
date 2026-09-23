@@ -82,8 +82,16 @@ static async Task SeedAsync(IServiceProvider services, bool dev)
     var pending = await db.Database.GetPendingMigrationsAsync();
     if (pending.Any())
     {
-        logger.LogWarning("Skipping seed: {Count} migrations are pending. Run `dotnet ef database update` first.", pending.Count());
-        return;
+        if (dev)
+        {
+            logger.LogInformation("Applying {Count} pending migrations...", pending.Count());
+            await db.Database.MigrateAsync();
+        }
+        else
+        {
+            logger.LogWarning("Skipping seed: {Count} migrations are pending. Run `dotnet ef database update` first.", pending.Count());
+            return;
+        }
     }
 
     await scope.ServiceProvider.GetRequiredService<DataSeeder>().SeedAsync(CancellationToken.None);

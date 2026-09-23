@@ -36,11 +36,11 @@ public sealed record SearchFilters
 }
 
 public sealed record SearchScope(
-    Guid SubjectId,
-    IReadOnlyList<Guid> ChapterIds,
+    Guid? SubjectId,
+    IReadOnlyList<Guid>? ChapterIds,
     QuestionType? Type,
     QuestionSource Source,
-    IReadOnlyList<Guid> BankIds,
+    IReadOnlyList<Guid>? BankIds,
     Guid? CurrentSetId = null);
 
 public sealed record SearchPage(IReadOnlyList<QuestionCard> Items, string? NextCursor, int TotalCount);
@@ -59,18 +59,22 @@ public sealed class QuestionSearch(AppDbContext db, ITenantContext tenant, IEnti
         var userId = tenant.UserId;
 
         var usesPlatform = scope.Source is QuestionSource.Platform or QuestionSource.Both;
-        if (usesPlatform)
+        if (usesPlatform && scope.SubjectId is { } subId && subId != Guid.Empty)
         {
-            await entitlements.EnsureSubjectAccessAsync(institutionId, scope.SubjectId, ct);   // 402 → UI offers "my banks only"
+            await entitlements.EnsureSubjectAccessAsync(institutionId, subId, ct);   // 402 → UI offers "my banks only"
         }
 
         var bankIds = await AccessibleBankIdsAsync(scope.BankIds, ct);
 
         var q = db.Questions.AsNoTracking()
-            .VisibleTo(institutionId, userId)
-            .Where(x => x.SubjectId == scope.SubjectId);
+            .VisibleTo(institutionId, userId);
 
-        if (scope.ChapterIds.Count > 0)
+        if (scope.SubjectId is { } sid && sid != Guid.Empty)
+        {
+            q = q.Where(x => x.SubjectId == sid);
+        }
+
+        if (scope.ChapterIds is { Count: > 0 })
         {
             q = q.Where(x => scope.ChapterIds.Contains(x.ChapterId));
         }
@@ -143,29 +147,44 @@ public sealed class QuestionSearch(AppDbContext db, ITenantContext tenant, IEnti
         var q = await QueryAsync(scope, filters, ct);
         var total = await q.CountAsync(ct);
 
+        if (scope.Source == QuestionSource.MyBanks && string.IsNullOrEmpty(cursor))
+        {
+            var take = Paging.Limit(limit);
+            var cards = await reader.CardsAsync(q.OrderByDescending(x => x.UpdatedAt).ThenByDescending(x => x.Id).Take(take + 1), ct);
+            string? next = null;
+            if (cards.Count > take)
+            {
+                cards.RemoveAt(take);
+                var last = cards[^1];
+                next = string.Create(CultureInfo.InvariantCulture, $"{last.ChapterNumber}:{last.Id:N}");
+            }
+
+            return new SearchPage(cards, next, total);
+        }
+
         if (ParseCursor(cursor) is var (number, id))
         {
             q = q.Where(x => x.Chapter!.Number > number || (x.Chapter!.Number == number && x.Id.CompareTo(id) > 0));
         }
 
-        var take = Paging.Limit(limit);
-        var cards = await reader.CardsAsync(q.OrderBy(x => x.Chapter!.Number).ThenBy(x => x.Id).Take(take + 1), ct);
-        string? next = null;
-        if (cards.Count > take)
+        var takeDefault = Paging.Limit(limit);
+        var cardsDefault = await reader.CardsAsync(q.OrderBy(x => x.Chapter!.Number).ThenBy(x => x.Id).Take(takeDefault + 1), ct);
+        string? nextDefault = null;
+        if (cardsDefault.Count > takeDefault)
         {
-            cards.RemoveAt(take);
-            var last = cards[^1];
-            next = string.Create(CultureInfo.InvariantCulture, $"{last.ChapterNumber}:{last.Id:N}");
+            cardsDefault.RemoveAt(takeDefault);
+            var last = cardsDefault[^1];
+            nextDefault = string.Create(CultureInfo.InvariantCulture, $"{last.ChapterNumber}:{last.Id:N}");
         }
 
-        return new SearchPage(cards, next, total);
+        return new SearchPage(cardsDefault, nextDefault, total);
     }
 
     /// <summary>Requested bank ids the user may read; an empty request means every accessible bank.</summary>
-    public async Task<List<Guid>> AccessibleBankIdsAsync(IReadOnlyList<Guid> requested, CancellationToken ct)
+    public async Task<List<Guid>> AccessibleBankIdsAsync(IReadOnlyList<Guid>? requested, CancellationToken ct)
     {
         var banks = db.QuestionBanks.AsNoTracking().AccessibleTo(tenant.UserId);
-        if (requested.Count > 0)
+        if (requested is { Count: > 0 })
         {
             banks = banks.Where(b => requested.Contains(b.Id));
         }

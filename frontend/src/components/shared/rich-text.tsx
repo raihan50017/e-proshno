@@ -35,6 +35,17 @@ function renderInlineMathString(text: string): React.ReactNode[] {
         />
       )
     }
+    // If part starts with or contains LaTeX commands like \frac, \sqrt, \alpha etc.
+    if (/\\(frac|sqrt|times|cdot|pm|alpha|beta|theta|pi|infty|leq|geq|neq|approx|sum|int|partial|vec|hat|bar|text)\b/.test(part)) {
+      const html = renderMath(part, false)
+      return (
+        <span
+          key={index}
+          className="inline-math"
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+      )
+    }
     return <React.Fragment key={index}>{part}</React.Fragment>
   })
 }

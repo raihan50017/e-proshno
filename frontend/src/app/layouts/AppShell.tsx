@@ -7,6 +7,7 @@ import {
   ChevronDown,
   CreditCard,
   Database,
+  FileCheck2,
   Files,
   GraduationCap,
   HelpCircle,
@@ -83,6 +84,7 @@ const navGroups: NavGroup[] = [
       { title: 'আমার প্রশ্নব্যাংক', href: '/my-banks', icon: Database },
       { title: 'প্রশ্ন ইমপোর্ট', href: '/imports', icon: UploadCloud },
       { title: 'শিক্ষার্থী তালিকা', href: '/students', icon: GraduationCap },
+      { title: 'ওএমআর মূল্যায়ন ও শীট', href: '/omr', icon: FileCheck2 },
     ],
   },
   {

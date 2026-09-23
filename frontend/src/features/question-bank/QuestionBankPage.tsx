@@ -1,6 +1,6 @@
 import * as React from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { BookOpen, Copy, Flag } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { BookOpen, Copy, Flag, PlusCircle, UploadCloud } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -14,19 +14,37 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
+import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { EmptyState } from '@/components/shared/empty-state'
 import { PageHeader } from '@/components/shared/page-header'
 import { QuestionItemCard } from '@/components/shared/question-item-card'
 import { SearchInput } from '@/components/shared/search-input'
 import { AddToSetModal } from '@/features/sets/AddToSetModal'
-import { QuestionEditModal } from './QuestionEditModal'
+import { QuestionUpsertModal } from './QuestionUpsertModal'
 import { useListBanks } from '@/lib/api/generated/question-banks/question-banks'
-import { useListSubjects, useListChapters } from '@/lib/api/generated/taxonomy/taxonomy'
+import { useListSubjects, useListChapters, useListLevels } from '@/lib/api/generated/taxonomy/taxonomy'
 import { useSearchQuestions, useCopyQuestions, useReportQuestion } from '@/lib/api/generated/questions/questions'
 import type { QuestionCard, ChapterDto, SubjectDto, BankDto, QuestionSource } from '@/lib/api/model'
+import { apiClient } from '@/lib/api-client'
 import { toBnDigits } from '@/lib/bn'
 
 export function QuestionBankPage() {
+  const { data: levelsData } = useListLevels()
+  const levels = React.useMemo(() => {
+    if (!levelsData) return []
+    if (Array.isArray(levelsData)) return levelsData
+    if ('data' in levelsData && Array.isArray((levelsData as any).data)) return (levelsData as any).data
+    return []
+  }, [levelsData])
+
+  const levelMap = React.useMemo(() => {
+    const map = new Map<string, string>()
+    levels.forEach((lvl: any) => {
+      if (lvl?.id && lvl?.nameBn) map.set(lvl.id, lvl.nameBn)
+    })
+    return map
+  }, [levels])
+
   const { data: subjectsData, isLoading: subjectsLoading } = useListSubjects()
   const subjects: SubjectDto[] = React.useMemo(() => {
     if (!subjectsData) return []
@@ -80,6 +98,11 @@ export function QuestionBankPage() {
   const [reportQuestion, setReportQuestion] = React.useState<QuestionCard | null>(null)
   const [reportReason, setReportReason] = React.useState('')
 
+  // Create & Delete Question State
+  const [isCreateOpen, setIsCreateOpen] = React.useState(false)
+  const [deleteQuestion, setDeleteQuestion] = React.useState<QuestionCard | null>(null)
+  const [isDeleting, setIsDeleting] = React.useState(false)
+
   const { mutate: search, isPending } = useSearchQuestions({
     mutation: {
       onSuccess: (data: any) => {
@@ -117,10 +140,28 @@ export function QuestionBankPage() {
   })
 
   React.useEffect(() => {
-    if (subjects.length > 0 && !selectedSubjectId) {
-      setSelectedSubjectId(subjects[0].id)
+    const bankId = searchParams.get('bankId')
+    if (bankId) {
+      setSelectedSource(1 as QuestionSource)
+      setSelectedBankId(bankId)
+      setSelectedSubjectId('all')
+      setSelectedChapterId('all')
     }
-  }, [subjects, selectedSubjectId])
+  }, [searchParams])
+
+  React.useEffect(() => {
+    if (subjects.length > 0 && !selectedSubjectId) {
+      if (selectedSource === 1) {
+        setSelectedSubjectId('all')
+      } else {
+        const preferred =
+          subjects.find((s) => s.code === 'hsc-physics-1') ||
+          subjects.find((s) => s.paper === 1) ||
+          subjects[0]
+        if (preferred) setSelectedSubjectId(preferred.id)
+      }
+    }
+  }, [subjects, selectedSubjectId, selectedSource])
 
   React.useEffect(() => {
     if (banks.length > 0 && !targetBankId) {
@@ -129,15 +170,19 @@ export function QuestionBankPage() {
   }, [banks, targetBankId])
 
   const executeSearch = React.useCallback(() => {
-    if (!selectedSubjectId && selectedSource === 0) return
+    if (selectedSource === 0 && (!selectedSubjectId || selectedSubjectId === 'all')) {
+      return
+    }
+
+    const effectiveSubject = selectedSubjectId && selectedSubjectId !== 'all' ? selectedSubjectId : null
 
     search({
       data: {
-        subjectId: selectedSubjectId || '',
-        chapterIds: selectedChapterId && selectedChapterId !== 'all' ? [selectedChapterId] : [],
+        subjectId: effectiveSubject,
+        chapterIds: effectiveSubject && selectedChapterId && selectedChapterId !== 'all' ? [selectedChapterId] : [],
         type: selectedType === 'All' ? null : selectedType === 'Mcq' ? 0 : 1,
         source: selectedSource,
-        bankIds: selectedSource === 1 && selectedBankId ? [selectedBankId] : [],
+        bankIds: selectedSource === 1 && selectedBankId && selectedBankId !== 'all' ? [selectedBankId] : [],
         filters: {
           keyword: keyword.trim() || null,
           mode: 0,
@@ -155,33 +200,44 @@ export function QuestionBankPage() {
     executeSearch()
   }, [executeSearch])
 
-  const subjectOptions = React.useMemo(
-    () =>
-      subjects.map((sub) => ({
+  const subjectOptions = React.useMemo(() => {
+    const list = subjects.map((sub) => {
+      const lvl = levelMap.get(sub.levelId)
+      const prefix = lvl ? `${lvl} - ` : ''
+      const paperText = sub.paper ? ` (${toBnDigits(sub.paper)}য় পত্র)` : ''
+      return {
         value: sub.id,
-        label: `${sub.label || sub.nameBn}${sub.paper ? ` (${toBnDigits(sub.paper)}য় পত্র)` : ''}`,
-      })),
-    [subjects]
-  )
+        label: `${prefix}${sub.label || sub.nameBn}${paperText}`,
+      }
+    })
+    if (selectedSource === 1) {
+      return [{ value: 'all', label: 'সকল বিষয় (সব প্রশ্ন)' }, ...list]
+    }
+    return list
+  }, [subjects, levelMap, selectedSource])
 
-  const chapterOptions = React.useMemo(
-    () => [
+  const chapterOptions = React.useMemo(() => {
+    if (!selectedSubjectId || selectedSubjectId === 'all') {
+      return [{ value: 'all', label: 'সকল অধ্যায়' }]
+    }
+    return [
       { value: 'all', label: `সকল অধ্যায় (${toBnDigits(chapters.length)} টি)` },
       ...chapters.map((ch) => ({
         value: ch.id,
         label: `${toBnDigits(ch.number)}. ${ch.nameBn || ch.label}`,
       })),
-    ],
-    [chapters]
-  )
+    ]
+  }, [chapters, selectedSubjectId])
 
   const bankOptions = React.useMemo(
-    () =>
-      banks.map((b) => ({
+    () => [
+      { value: 'all', label: 'সকল নিজস্ব ব্যাংক' },
+      ...banks.map((b) => ({
         value: b.id,
         label: b.name,
         description: b.sharing === 0 ? 'ব্যক্তিগত ব্যাংক' : 'প্রাতিষ্ঠানিক ব্যাংক',
       })),
+    ],
     [banks]
   )
 
@@ -215,6 +271,28 @@ export function QuestionBankPage() {
     })
   }
 
+  const handleDeleteQuestion = async () => {
+    if (!deleteQuestion) return
+    const bId = deleteQuestion.bankId || selectedBankId
+    if (!bId) {
+      toast.error('টার্গেট ব্যাংক শনাক্ত করা যায়নি')
+      return
+    }
+
+    setIsDeleting(true)
+    try {
+      await apiClient.delete(`/api/v1/question-banks/${bId}/questions/${deleteQuestion.id}`)
+      toast.success('প্রশ্নটি সফলভাবে মুছে ফেলা হয়েছে!')
+      setDeleteQuestion(null)
+      executeSearch()
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail || 'প্রশ্ন মুছতে সমস্যা হয়েছে'
+      toast.error(msg)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -224,6 +302,24 @@ export function QuestionBankPage() {
           { label: 'ড্যাশবোর্ড', href: '/dashboard' },
           { label: 'প্রশ্নব্যাংক' },
         ]}
+        actions={
+          <div className="flex items-center gap-2">
+            <Link to={`/imports${selectedBankId ? `?bankId=${selectedBankId}` : ''}`}>
+              <Button variant="outline" size="sm" className="gap-1.5 h-9 text-xs">
+                <UploadCloud className="size-4 text-primary" />
+                ইমপোর্ট
+              </Button>
+            </Link>
+            <Button
+              size="sm"
+              className="gap-1.5 h-9 text-xs shadow-xs"
+              onClick={() => setIsCreateOpen(true)}
+            >
+              <PlusCircle className="size-4" />
+              নতুন প্রশ্ন তৈরি
+            </Button>
+          </div>
+        }
       />
 
       {/* Filter Toolbar Card */}
@@ -237,6 +333,13 @@ export function QuestionBankPage() {
                 onClick={() => {
                   setSelectedSource(0)
                   setSelectedBankId('')
+                  if (selectedSubjectId === 'all' || !selectedSubjectId) {
+                    const preferred =
+                      subjects.find((s) => s.code === 'hsc-physics-1') ||
+                      subjects.find((s) => s.paper === 1) ||
+                      subjects[0]
+                    if (preferred) setSelectedSubjectId(preferred.id)
+                  }
                 }}
                 className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
                   selectedSource === 0
@@ -250,9 +353,11 @@ export function QuestionBankPage() {
                 type="button"
                 onClick={() => {
                   setSelectedSource(1)
-                  if (banks.length > 0 && !selectedBankId) {
+                  if (banks.length > 0 && (!selectedBankId || selectedBankId === 'all')) {
                     setSelectedBankId(banks[0].id)
                   }
+                  setSelectedSubjectId('all')
+                  setSelectedChapterId('all')
                 }}
                 className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
                   selectedSource === 1
@@ -271,7 +376,16 @@ export function QuestionBankPage() {
                   <Combobox
                     options={bankOptions}
                     value={selectedBankId}
-                    onChange={(val) => setSelectedBankId(val)}
+                    onChange={(val) => {
+                      setSelectedBankId(val)
+                      const matched = banks.find((b) => b.id === val)
+                      if (matched?.subjectId) {
+                        setSelectedSubjectId(matched.subjectId)
+                      } else {
+                        setSelectedSubjectId('all')
+                      }
+                      setSelectedChapterId('all')
+                    }}
                     placeholder="ব্যাংক নির্বাচন করুন"
                     searchPlaceholder="ব্যাংক খুঁজুন..."
                     triggerClassName="h-8 text-xs"
@@ -373,6 +487,7 @@ export function QuestionBankPage() {
               index={idx}
               onAddToSet={(item) => setAddToSetQuestion(item)}
               onEdit={(item) => setEditQuestion(item)}
+              onDelete={(item) => setDeleteQuestion(item)}
               onCopy={(item) => setCopyQuestion(item)}
               onReport={(item) => setReportQuestion(item)}
             />
@@ -505,10 +620,33 @@ export function QuestionBankPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Question Edit Modal (for custom / imported questions) */}
-      <QuestionEditModal
+      {/* Delete Question Confirmation Dialog */}
+      <ConfirmDialog
+        open={Boolean(deleteQuestion)}
+        onOpenChange={(open) => !open && setDeleteQuestion(null)}
+        title="প্রশ্ন মুছে ফেলার নিশ্চিতকরণ"
+        description="আপনি কি নিশ্চিতভাবে এই প্রশ্নটি আপনার প্রশ্নব্যাংক থেকে মুছে ফেলতে চান? এটি মুছে ফেললে তা আর ফিরিয়ে আনা যাবে না।"
+        confirmText="মুছে ফেলুন"
+        cancelText="বাতিল"
+        confirmVariant="destructive"
+        loading={isDeleting}
+        onConfirm={handleDeleteQuestion}
+      />
+
+      {/* Question Create Modal */}
+      <QuestionUpsertModal
+        isOpen={isCreateOpen}
+        bankId={selectedBankId && selectedBankId !== 'all' ? selectedBankId : (banks.length > 0 ? banks[0].id : undefined)}
+        subjectId={selectedSubjectId && selectedSubjectId !== 'all' ? selectedSubjectId : undefined}
+        chapterId={selectedChapterId && selectedChapterId !== 'all' ? selectedChapterId : undefined}
+        onClose={() => setIsCreateOpen(false)}
+        onSuccess={() => executeSearch()}
+      />
+
+      {/* Question Edit Modal */}
+      <QuestionUpsertModal
         question={editQuestion}
-        bankId={selectedBankId || editQuestion?.bankId || undefined}
+        bankId={editQuestion?.bankId || (selectedBankId && selectedBankId !== 'all' ? selectedBankId : undefined)}
         isOpen={Boolean(editQuestion)}
         onClose={() => setEditQuestion(null)}
         onSuccess={() => executeSearch()}

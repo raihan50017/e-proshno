@@ -4,6 +4,7 @@ using EProshno.Core.Common;
 using EProshno.Core.Imports;
 using EProshno.Core.Institutions;
 using EProshno.Core.Questions;
+using EProshno.Core.Taxonomy;
 using EProshno.Core.Text;
 using EProshno.Infrastructure.Identity;
 using EProshno.Infrastructure.Imports;
@@ -68,6 +69,19 @@ public sealed class DevDataSeeder(
         if (!await db.Questions.AnyAsync(q => q.BankId == null, ct))
         {
             await SeedQuestionsAsync(admin.Id, ct);
+        }
+
+        var sscPhysics = await db.Subjects.FirstOrDefaultAsync(s => s.Code == "ssc-physics", ct);
+        if (sscPhysics != null && !await db.Questions.AnyAsync(q => q.SubjectId == sscPhysics.Id && q.BankId == null, ct))
+        {
+            await SeedSubjectQuestionsAsync(admin.Id, sscPhysics, SampleTextSscPhysics(), null, ct);
+        }
+
+        var teacherBank = await db.QuestionBanks.FirstOrDefaultAsync(b => b.OwnerId == teacher.Id && b.IsDefault, ct);
+        if (teacherBank != null && !await db.Questions.AnyAsync(q => q.BankId == teacherBank.Id, ct))
+        {
+            var hscPhysics = await db.Subjects.FirstAsync(s => s.Code == "hsc-physics-1", ct);
+            await SeedSubjectQuestionsAsync(teacher.Id, hscPhysics, SampleTextTeacherBank(), teacherBank.Id, ct);
         }
 
         logger.LogInformation("Development data seeded ({Admin} / {Teacher})", AdminEmail, TeacherEmail);
@@ -220,6 +234,111 @@ public sealed class DevDataSeeder(
             গ. $5$ সেকেন্ডে গাড়িটি কত দূরত্ব অতিক্রম করবে? [৩]
             ঘ. $5$ সেকেন্ড পর গাড়িটি $1$ মি/সে² সুষম মন্দনে চললে থামার আগে মোট কত দূরত্ব অতিক্রম করবে? বিশ্লেষণ করো। [৪]
             উত্তর গ: $s = \frac{1}{2}at^2 = \frac{1}{2} \times 2 \times 5^2 = 25$ মিটার
+            """;
+    }
+
+    private async Task SeedSubjectQuestionsAsync(Guid authorId, Subject subject, string sampleText, Guid? bankId, CancellationToken ct)
+    {
+        var defaults = new ImportDefaults { LevelId = subject.LevelId, SubjectId = subject.Id, Type = QuestionType.Mcq };
+        tenant.Set(authorId, null, bankId == null ? Roles.ContentEditor : Roles.Teacher);
+
+        var context = await resolver.LoadAsync(subject.Id, null, ct);
+        var drafts = QuestionTextParser.Parse(sampleText);
+        var rows = await resolver.ResolveAsync(drafts, defaults, context, platformTarget: bankId == null, ct);
+        var groups = new Dictionary<string, Guid>(StringComparer.Ordinal);
+        var created = 0;
+        foreach (var row in rows.Where(r => r.Status is ImportRowStatus.Ok or ImportRowStatus.Warning))
+        {
+            var content = DraftMapper.ToContent(row.Draft, defaults);
+            if (row.Draft.GroupKey is { } key && groups.TryGetValue(key, out var stimulusId))
+            {
+                content = content with { StimulusId = stimulusId };
+            }
+
+            var question = writer.Create(content with { IsCommon = created % 3 == 0 }, bankId, ContentStatus.Published, authorId);
+            if (row.Draft.GroupKey is { } newKey && question.StimulusId is { } sid)
+            {
+                groups.TryAdd(newKey, sid);
+            }
+
+            created++;
+        }
+
+        if (bankId is { } bid)
+        {
+            var bank = await db.QuestionBanks.FindAsync([bid], ct);
+            if (bank != null)
+            {
+                bank.QuestionCount += created;
+            }
+        }
+
+        await db.SaveChangesAsync(ct);
+        logger.LogInformation("Seeded {Count} questions for {Code} (bank: {Bank})", created, subject.Code, bankId);
+    }
+
+    private static string SampleTextSscPhysics()
+    {
+        var ch = BanglaWords.Chapter;
+        return $$"""
+            {{ch}}: ১
+            ১. আন্তর্জাতিক পদ্ধতিতে (SI) পদার্থের পরিমাণের একক কোনটি?
+            ক. কিলোগ্রাম   খ. ক্যান্ডেলা   গ. মোল   ঘ. কেলভিন
+            উত্তর: গ
+            ব্যাখ্যা: SI পদ্ধতিতে পদার্থের পরিমাণের একক মোল।
+            কঠিনতা: ১
+
+            ২. ভার্নিয়ার স্কেলের ২০ ঘর প্রধান স্কেলের ১৯ ঘরের সমান হলে এবং প্রধান স্কেলের এক ঘর ১ মিমি হলে ভার্নিয়ার ধ্রুবক কত?
+            ক. ০.০৫ মিমি   খ. ০.০২ মিমি   গ. ০.০১ মিমি   ঘ. ০.১ মিমি
+            উত্তর: ক
+            কঠিনতা: ২
+
+            {{ch}}: ২
+            ৩. নিচের কোনটি ভেক্টর রাশি?
+            ক. দ্রুতি   খ. কাজ   গ. বেগ   ঘ. তাপমাত্রা
+            উত্তর: গ
+            ব্যাখ্যা: বেগের মান এবং দিক উভয়ই রয়েছে।
+            কঠিনতা: ১
+
+            ৪. মুক্তভাবে পরন্ত কোনো বস্তুর ক্ষেত্রে কোনটি সঠিক?
+            ক. $v \propto t$   খ. $v \propto t^2$   গ. $s \propto t$   ঘ. $s \propto \sqrt{t}$
+            উত্তর: ক
+            ব্যাখ্যা: গ্যালিলিওর পরন্ত বস্তুর দ্বিতীয় সূত্রানুযায়ী $v \propto t$।
+            কঠিনতা: ২
+
+            {{ch}}: ৩
+            ৫. নিউটনের গতির দ্বিতীয় সূত্র কোনটি?
+            ক. $F = ma$   খ. $v = u + at$   গ. $s = ut$   ঘ. $E = mc^2$
+            উত্তর: ক
+            ব্যাখ্যা: প্রযুক্ত বল বস্তুর ভর ও ত্বরণের গুণফলের সমানুপাতিক, $F = ma$।
+            কঠিনতা: ১
+
+            {{ch}}: ৪
+            ৬. ১ অশ্বক্ষমতা (HP) সমান কত ওয়াট?
+            ক. ৫০০ ওয়াট   খ. ৭৪৬ ওয়াট   গ. ১০০০ ওয়াট   ঘ. ৭০০ ওয়াট
+            উত্তর: খ
+            ব্যাখ্যা: ১ HP = ৭৪৬ W (ওয়াট)।
+            কঠিনতা: ১
+            """;
+    }
+
+    private static string SampleTextTeacherBank()
+    {
+        var ch = BanglaWords.Chapter;
+        return $$"""
+            {{ch}}: ১
+            ১. [শিক্ষক নিজস্ব] স্লাইড ক্যালিপার্সের সাহায্যে কী পরিমাপ করা হয়?
+            ক. ভর   খ. দৈর্ঘ্য   গ. সময়   ঘ. তাপমাত্রা
+            উত্তর: খ
+            ব্যাখ্যা: স্লাইড ক্যালিপার্সের সাহায্যে কোনো বস্তুর দৈর্ঘ্য, ব্যাস বা পুরুত্ব সূক্ষ্মভাবে মাপা যায়।
+            কঠিনতা: ১
+
+            {{ch}}: ২
+            ২. [শিক্ষক নিজস্ব] সমদ্রুতিতে বৃত্তাকার পথে ঘূর্ণায়মান বস্তুর ক্ষেত্রে কোনটি সত্য?
+            ক. ত্বরণ শূন্য   খ. বেগ ধ্রুব   গ. দিক পরিবর্তিত হয়   ঘ. কোনো বল নেই
+            উত্তর: গ
+            ব্যাখ্যা: বৃত্তাকার পথে গতির দিক প্রতিনিয়ত পরিবর্তিত হয় বলে কেন্দ্রমুখী ত্বরণ বিদ্যমান থাকে।
+            কঠিনতা: ২
             """;
     }
 }

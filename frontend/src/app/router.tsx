@@ -17,6 +17,7 @@ import { SupportPage } from '@/features/support/SupportPage'
 import { PaperPrintPage } from '@/features/sets/PaperPrintPage'
 import { AdminPage } from '@/features/admin/AdminPage'
 import { SmartboardPage } from '@/features/smartboard/SmartboardPage'
+import { OmrPage } from '@/features/omr/OmrPage'
 
 export const router = createBrowserRouter([
   // Public auth routes
@@ -85,8 +86,16 @@ export const router = createBrowserRouter([
             element: <ImportsPage />,
           },
           {
+            path: '/my-questions',
+            element: <Navigate to="/imports?tab=questions" replace />,
+          },
+          {
             path: '/students',
             element: <StudentsPage />,
+          },
+          {
+            path: '/omr',
+            element: <OmrPage />,
           },
           {
             path: '/institution',

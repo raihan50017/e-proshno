@@ -2,6 +2,7 @@ import * as React from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   Copy,
+  FileCheck2,
   FilePlus2,
   Files,
   Layers2,
@@ -45,12 +46,17 @@ export function QuestionSetsPage() {
   const [isDeleting, setIsDeleting] = React.useState(false)
   const [duplicatingId, setDuplicatingId] = React.useState<string | null>(null)
 
-  // Auto-open modal if ?id= is passed from Generate flow
+  // Auto-open modal if ?id= or ?editSetId= is passed from Generate flow
   React.useEffect(() => {
     const idParam = searchParams.get('id')
+    const editIdParam = searchParams.get('editSetId')
     if (idParam) {
       setSelectedSetIdForView(idParam)
       searchParams.delete('id')
+      setSearchParams(searchParams, { replace: true })
+    } else if (editIdParam) {
+      setSelectedSetIdForEdit(editIdParam)
+      searchParams.delete('editSetId')
       setSearchParams(searchParams, { replace: true })
     }
   }, [searchParams, setSearchParams])
@@ -283,6 +289,19 @@ export function QuestionSetsPage() {
                               <span className="hidden sm:inline">স্মার্টবোর্ড</span>
                             </Button>
                           </Link>
+                          {set.type === 0 && (
+                            <Link to={`/omr?setId=${set.id}`}>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 text-xs gap-1 border-border text-purple-700 dark:text-purple-400 hover:bg-purple-500/10"
+                                title="এই প্রশ্নসেটের জন্য ওএমআর শীট তৈরি করুন"
+                              >
+                                <FileCheck2 className="size-3.5" />
+                                <span className="hidden sm:inline">ওএমআর</span>
+                              </Button>
+                            </Link>
+                          )}
                           <Button
                             variant="outline"
                             size="sm"
